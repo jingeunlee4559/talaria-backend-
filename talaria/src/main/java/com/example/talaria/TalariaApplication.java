@@ -9,5 +9,6 @@ public class TalariaApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(TalariaApplication.class, args);
 	}
+	// test
 
 }
