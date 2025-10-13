@@ -2,9 +2,10 @@ server:
   port: 8080
 
 talaria:
-  aiBaseUrl: "http://127.0.0.1:8000"  # FastAPI 포트
+  aiBaseUrl: "http://127.0.0.1:8000"
   sessionTtlSeconds: 600
   cors:
     origins:
       - "http://localhost:3000"
       - "http://127.0.0.1:3000"
+      - "*"   # 필요시 제거 (운영에서는 구체 도메인만 허용)
