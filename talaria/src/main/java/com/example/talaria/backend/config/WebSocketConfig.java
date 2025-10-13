@@ -7,16 +7,17 @@ import org.springframework.web.socket.config.annotation.*;
 @Configuration
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
-
     private final SubtitleWebSocketHandler handler;
+    private final AuthHandshakeInterceptor auth;
 
-    public WebSocketConfig(SubtitleWebSocketHandler handler) {
-        this.handler = handler;
+    public WebSocketConfig(SubtitleWebSocketHandler handler, AuthHandshakeInterceptor auth) {
+        this.handler = handler; this.auth = auth;
     }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(handler, "/ws/subtitles")
-                .setAllowedOrigins("*");  // 프론트엔드 3000 포트 접근 허용
+                .addInterceptors(auth)
+                .setAllowedOrigins("http://localhost:3000", "http://127.0.0.1:3000"); // 운영 시 도메인으로 한정
     }
 }

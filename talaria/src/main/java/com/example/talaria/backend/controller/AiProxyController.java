@@ -30,4 +30,9 @@ public class AiProxyController {
     public Mono<String> tts(@RequestBody Map<String, Object> req) {
         return aiClient.post().uri("/tts").bodyValue(req).retrieve().bodyToMono(String.class);
     }
+    
+    @PostMapping("/advice")
+    public Mono<String> advice(@RequestBody Map<String, Object> req) {
+        return aiClient.post().uri("/advice").bodyValue(req).retrieve().bodyToMono(String.class);
+    }
 }
