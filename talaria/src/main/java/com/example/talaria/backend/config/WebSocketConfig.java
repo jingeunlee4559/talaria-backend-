@@ -1,5 +1,6 @@
 package com.example.talaria.backend.config;
 
+import com.example.talaria.backend.ws.AuthHandshakeInterceptor;
 import com.example.talaria.backend.ws.SubtitleWebSocketHandler;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.*;
@@ -7,6 +8,7 @@ import org.springframework.web.socket.config.annotation.*;
 @Configuration
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
+
     private final SubtitleWebSocketHandler handler;
     private final AuthHandshakeInterceptor auth;
 
@@ -18,6 +20,6 @@ public class WebSocketConfig implements WebSocketConfigurer {
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(handler, "/ws/subtitles")
                 .addInterceptors(auth)
-                .setAllowedOrigins("http://localhost:3000", "http://127.0.0.1:3000"); // 운영 시 도메인으로 한정
+                .setAllowedOrigins("http://localhost:3000", "http://127.0.0.1:3000");
     }
 }

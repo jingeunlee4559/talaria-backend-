@@ -1,75 +1,46 @@
 package com.example.talaria.backend.controller;
 
-import com.example.talaria.backend.model.SessionCreateResponse;
-import com.example.talaria.backend.model.SessionSettingsRequest;
+import com.example.talaria.backend.service.SessionService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.SecureRandom;
-import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/sessions")
 public class SessionController {
 
-    private final Map<String, Map<String, Object>> SESSIONS = new ConcurrentHashMap<>();
-    private final SecureRandom rnd = new SecureRandom();
+    private final SessionService sessionService;
+    private final String wsBase;
 
-    @Value("${talaria.sessionTtlSeconds:600}")
-    private long sessionTtl;
+    public SessionController(SessionService sessionService,
+                             @Value("${server.port:8080}") int port) {
+        this.sessionService = sessionService;
+        this.wsBase = "ws://localhost:" + port;
+    }
 
-    @PostMapping
-    public SessionCreateResponse create() {
-        String sid = hex(6);
-        long now = Instant.now().getEpochSecond();
-        long exp = now + sessionTtl;
-        String token = hex(16);
-
-        Map<String, Object> settings = new HashMap<>();
-        settings.put("voiceover_enabled", true);
-        settings.put("caption_commit_ms", 400);
-        settings.put("font_size", 18);
-        settings.put("high_contrast", false);
-
-        Map<String, Object> sess = new HashMap<>();
-        sess.put("created_at", now);
-        sess.put("expires_at", exp);
-        sess.put("settings", settings);
-        SESSIONS.put(sid, sess);
-
-        return new SessionCreateResponse(
-                sid,
-                "/ws/subtitles?sid=" + sid,
-                token,
-                exp
+    @PostMapping("/sessions")
+    public Map<String, Object> createSession() {
+        var s = sessionService.create();
+        String wsUrl = wsBase + "/ws/subtitles?sid=" + s.id() + "&token=" + s.token();
+        return Map.of(
+                "session_id", s.id(),
+                "token", s.token(),
+                "expires_at", s.expiresAt(),
+                "ws_url", wsUrl,
+                "settings", s.settings()
         );
     }
 
-    @PostMapping("/{sid}/end")
-    public Map<String, Object> end(@PathVariable String sid) {
-        boolean ok = (SESSIONS.remove(sid) != null);
-        return Map.of("ok", ok, "session_id", sid);
+    @PostMapping("/sessions/{sid}/settings")
+    public ResponseEntity<?> updateSettings(@PathVariable String sid, @RequestBody Map<String,Object> patch) {
+        boolean ok = sessionService.updateSettings(sid, patch);
+        return ok ? ResponseEntity.ok(Map.of("updated", true)) : ResponseEntity.notFound().build();
     }
 
-    @PostMapping("/{sid}/settings")
-    public Map<String, Object> settings(@PathVariable String sid, @RequestBody SessionSettingsRequest req) {
-        Map<String, Object> sess = SESSIONS.get(sid);
-        if (sess == null) return Map.of("ok", false, "session_id", sid);
-        Map<String, Object> st = (Map<String, Object>) sess.get("settings");
-        if (req.voiceover_enabled() != null) st.put("voiceover_enabled", req.voiceover_enabled());
-        if (req.caption_commit_ms() != null) st.put("caption_commit_ms", req.caption_commit_ms());
-        if (req.font_size() != null) st.put("font_size", req.font_size());
-        if (req.high_contrast() != null) st.put("high_contrast", req.high_contrast());
-        return Map.of("ok", true, "session_id", sid);
-    }
-
-    private String hex(int bytes) {
-        byte[] b = new byte[bytes];
-        rnd.nextBytes(b);
-        StringBuilder sb = new StringBuilder();
-        for (byte v : b) sb.append(String.format("%02x", v));
-        return sb.toString();
+    @PostMapping("/sessions/{sid}/end")
+    public ResponseEntity<?> end(@PathVariable String sid) {
+        boolean ok = sessionService.end(sid);
+        return ok ? ResponseEntity.ok(Map.of("ended", true)) : ResponseEntity.notFound().build();
     }
 }

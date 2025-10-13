@@ -12,8 +12,12 @@ import java.util.Map;
 
 @Component
 public class AuthHandshakeInterceptor implements HandshakeInterceptor {
+
     private final SessionService sessionService;
-    public AuthHandshakeInterceptor(SessionService sessionService) { this.sessionService = sessionService; }
+
+    public AuthHandshakeInterceptor(SessionService sessionService) {
+        this.sessionService = sessionService;
+    }
 
     @Override
     public boolean beforeHandshake(ServerHttpRequest req, ServerHttpResponse res,
@@ -21,11 +25,14 @@ public class AuthHandshakeInterceptor implements HandshakeInterceptor {
         var q = UriComponentsBuilder.fromUri(req.getURI()).build().getQueryParams();
         String sid = q.getFirst("sid");
         String token = q.getFirst("token");
-        if (sid == null || token == null || !sessionService.validate(sid, token)) return false;
+        if (sid == null || token == null || !sessionService.validate(sid, token)) {
+            return false;
+        }
         attrs.put("sid", sid);
         return true;
     }
 
-    @Override public void afterHandshake(ServerHttpRequest req, ServerHttpResponse res,
-                                         WebSocketHandler handler, Exception ex) {}
+    @Override
+    public void afterHandshake(ServerHttpRequest req, ServerHttpResponse res,
+                               WebSocketHandler handler, Exception ex) {}
 }

@@ -19,12 +19,12 @@ public class AppConfig {
     @Value("${talaria.cors.origins:*}")
     private String corsOriginsRaw;
 
-    @Bean
-    public WebClient aiWebClient() {
-        return WebClient.builder()
-                .baseUrl(aiBaseUrl)
-                .build();
-    }
+    // @Bean
+    // public WebClient aiWebClient() {
+    //     return WebClient.builder()
+    //             .baseUrl(aiBaseUrl)
+    //             .build();
+    // }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {

@@ -1,5 +1,6 @@
 package com.example.talaria.backend.controller;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -12,8 +13,8 @@ public class AiProxyController {
 
     private final WebClient aiClient;
 
-    public AiProxyController(WebClient aiWebClient) {
-        this.aiClient = aiWebClient;
+    public AiProxyController(@Qualifier("aiClient") WebClient aiClient) {
+        this.aiClient = aiClient;
     }
 
     @PostMapping("/stt")
@@ -30,7 +31,8 @@ public class AiProxyController {
     public Mono<String> tts(@RequestBody Map<String, Object> req) {
         return aiClient.post().uri("/tts").bodyValue(req).retrieve().bodyToMono(String.class);
     }
-    
+
+    // 문화 팁(매너 가이드)
     @PostMapping("/advice")
     public Mono<String> advice(@RequestBody Map<String, Object> req) {
         return aiClient.post().uri("/advice").bodyValue(req).retrieve().bodyToMono(String.class);

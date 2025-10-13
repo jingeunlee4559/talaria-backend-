@@ -1,5 +1,6 @@
 package com.example.talaria.backend.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -15,7 +16,13 @@ public class SessionService {
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
     private final SecureRandom rnd = new SecureRandom();
 
-    public Session create(long ttlSec) {
+    private final long ttlSec;
+
+    public SessionService(@Value("${talaria.sessionTtlSeconds:600}") long ttlSec) {
+        this.ttlSec = ttlSec;
+    }
+
+    public Session create() {
         String sid = hex(6);
         String token = hex(16);
         long exp = Instant.now().getEpochSecond() + ttlSec;
@@ -31,7 +38,15 @@ public class SessionService {
     }
 
     public Session get(String sid) { return sessions.get(sid); }
+
     public boolean end(String sid) { return sessions.remove(sid) != null; }
+
+    public boolean updateSettings(String sid, Map<String,Object> patch) {
+        Session s = sessions.get(sid);
+        if (s == null) return false;
+        s.settings().putAll(patch);
+        return true;
+    }
 
     public boolean validate(String sid, String token) {
         Session s = sessions.get(sid);

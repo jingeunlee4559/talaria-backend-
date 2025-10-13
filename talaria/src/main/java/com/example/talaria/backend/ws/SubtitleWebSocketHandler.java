@@ -1,17 +1,15 @@
 package com.example.talaria.backend.ws;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.type.TypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
 
-import java.net.URI;
+import java.io.IOException;
 import java.util.Map;
-import java.util.Optional;
-import java.time.Instant;
 
 @Component
 public class SubtitleWebSocketHandler implements WebSocketHandler {
+
     private final WebSocketChannelRegistry registry;
     private final ObjectMapper om = new ObjectMapper();
 
@@ -20,66 +18,37 @@ public class SubtitleWebSocketHandler implements WebSocketHandler {
     }
 
     @Override
+    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+        String sid = (String) session.getAttributes().get("sid");
+        registry.join(sid, session);
+
+        // 입장 알림 (선택)
+        var msg = Map.of("type", "notice", "text", "client joined", "ts", System.currentTimeMillis());
+        session.sendMessage(new TextMessage(om.writeValueAsString(msg)));
+    }
+
+    @Override
     public void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception {
         String sid = (String) session.getAttributes().get("sid");
-        if (sid == null) sid = "unknown";
-
-        try {
-            Map<String, Object> in = om.readValue(
-                    message.getPayload().toString(),
-                    new TypeReference<Map<String, Object>>() {}
-            );
-
-            String type = Optional.ofNullable(in.get("type"))
-                    .map(Object::toString)
-                    .orElse("partial");
-            String text = Optional.ofNullable(in.get("text"))
-                    .map(Object::toString)
-                    .orElse("");
-
-            registry.broadcast(sid, om.writeValueAsString(Map.of(
-                    "type", type,
-                    "text", text,
-                    "ts", Instant.now().toEpochMilli()
-            )));
-        } catch (Exception e) {
-            registry.broadcast(sid, om.writeValueAsString(Map.of(
-                    "type", "error",
-                    "message", "Invalid message format",
-                    "detail", e.getMessage()
-            )));
+        // 받은 메시지를 같은 sid 룸에 브로드캐스트
+        for (var peer : registry.peers(sid)) {
+            if (peer.isOpen()) {
+                peer.sendMessage((TextMessage) message);
+            }
         }
     }
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        String sid = extractSessionId(session.getUri());
-        session.getAttributes().put("sid", sid);
-        registry.join(sid, session);
-        registry.broadcast(sid, om.writeValueAsString(Map.of("type", "notice", "message", "client joined: " + sid)));
+    public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
+        // 로깅만
     }
 
     @Override
-    public void handleTransportError(WebSocketSession session, Throwable exception) {}
-
-    @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) throws Exception {
         String sid = (String) session.getAttributes().get("sid");
         registry.leave(sid, session);
-        registry.broadcast(sid, om.writeValueAsString(Map.of("type", "notice", "message", "client left")));
     }
 
     @Override
-    public boolean supportsPartialMessages() {
-        return false;
-    }
-
-    private String extractSessionId(URI uri) {
-        if (uri == null || uri.getQuery() == null) return "unknown";
-        for (String p : uri.getQuery().split("&")) {
-            String[] kv = p.split("=", 2);
-            if (kv.length == 2 && kv[0].equals("sid")) return kv[1];
-        }
-        return "unknown";
-    }
+    public boolean supportsPartialMessages() { return false; }
 }
