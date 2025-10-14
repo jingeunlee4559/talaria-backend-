@@ -56,6 +56,13 @@
       <groupId>jakarta.validation</groupId>
       <artifactId>jakarta.validation-api</artifactId>
     </dependency>
+
+    <!-- livekit -->
+    <dependency>
+      <groupId>io.livekit</groupId>
+      <artifactId>livekit-server</artifactId>
+      <version>0.10.1</version>
+    </dependency>
     <!-- Test  -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -63,11 +70,11 @@
       <scope>test</scope>
     </dependency>
 	<!-- swagger -->
-	<dependency>
-		<groupId>org.springdoc</groupId>
-		<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-		<version>2.6.0</version>
-	</dependency>
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <version>2.6.0</version>
+    </dependency>
   </dependencies>
 
   <build>

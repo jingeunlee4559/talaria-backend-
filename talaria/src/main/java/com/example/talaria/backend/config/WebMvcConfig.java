@@ -14,6 +14,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Value("#{'${cors.allowed-origins}'.split(',')}")
     private List<String> allowed;
+    
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
