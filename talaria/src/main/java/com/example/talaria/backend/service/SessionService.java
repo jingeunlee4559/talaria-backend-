@@ -18,7 +18,7 @@ public class SessionService {
 
     private final long ttlSec;
 
-    public SessionService(@Value("${talaria.sessionTtlSeconds:600}") long ttlSec) {
+    public SessionService(@Value("${talaria.sessionTtlSeconds:60}") long ttlSec) {
         this.ttlSec = ttlSec;
     }
 
