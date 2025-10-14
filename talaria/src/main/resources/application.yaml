@@ -1,3 +1,7 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+
 server:
   port: 8080
 
@@ -7,11 +11,10 @@ talaria:
 
 cors:
   allowed-origins: "http://localhost:3000,http://127.0.0.1:3000"
+
 livekit:
-  # 클라이언트(WebRTC) 접속용
-  wsUrl: "wss://<your-project>.livekit.cloud"   # self-host면 wss://<host>:<port>
-  # 서버 API(RoomService 등) 호출용
-  apiUrl: "https://<your-project>.livekit.cloud" # self-host면 http(s)://<host>:<port>
+  # 기본은 LIVEKIT_URL 사용. 필요 시 LIVEKIT_WS_URL/LIVEKIT_API_URL 별도 지정 가능.
+  wsUrl: "${LIVEKIT_WS_URL:${LIVEKIT_URL}}"
+  apiUrl: "${LIVEKIT_API_URL:${LIVEKIT_URL}}"
   apiKey: "${LIVEKIT_API_KEY}"
   apiSecret: "${LIVEKIT_API_SECRET}"
-

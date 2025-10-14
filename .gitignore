@@ -34,3 +34,4 @@ build/
 .vscode/
 talaria/src/main/resources/application.yaml
 *.yaml
+.env
