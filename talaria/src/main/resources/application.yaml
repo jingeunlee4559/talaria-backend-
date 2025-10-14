@@ -14,3 +14,4 @@ livekit:
   apiUrl: "https://<your-project>.livekit.cloud" # self-host면 http(s)://<host>:<port>
   apiKey: "${LIVEKIT_API_KEY}"
   apiSecret: "${LIVEKIT_API_SECRET}"
+
