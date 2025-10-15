@@ -56,7 +56,6 @@
       <groupId>jakarta.validation</groupId>
       <artifactId>jakarta.validation-api</artifactId>
     </dependency>
-
     <!-- livekit -->
     <dependency>
       <groupId>io.livekit</groupId>

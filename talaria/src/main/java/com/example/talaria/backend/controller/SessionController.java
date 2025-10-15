@@ -32,24 +32,12 @@ public class SessionController {
     public Map<String, Object> createSession() {
         var s = sessionService.create();
         String wsUrl = wsBase + "/ws/subtitles?sid=" + s.id() + "&token=" + s.token();
-        String room = "talaria-" + s.id();
-        String identity = "user-" + s.id();
-        long now = Instant.now().getEpochSecond();
-        long ttlSec = Math.max(60, s.expiresAt() - now);
-        String lkToken = livekitService.createJoinToken(room, identity, "Guest", ttlSec);
-
         return Map.of(
             "session_id", s.id(),
             "token", s.token(),
             "expires_at", s.expiresAt(),
             "ws_url", wsUrl,
-            "settings", s.settings(),
-            "livekit", Map.of(
-                "wsUrl", livekitConfig.getWsUrl(),
-                "token", lkToken,
-                "room", room,
-                "identity", identity
-            )
+            "settings", s.settings()
         );
     }
 
