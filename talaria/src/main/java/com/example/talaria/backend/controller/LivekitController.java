@@ -47,8 +47,8 @@ public class LivekitController {
     String identity = req.identity();
     String name = (req.name() == null || req.name().isBlank()) ? "Guest" : trim(req.name(), 64);
 
-    long ttl = (req.ttlSec() == null) ? 600L : req.ttlSec();
-    if (ttl < 30L || ttl > 3600L) ttl = 600L; // 최소 30초, 최대 1시간 범위 내
+    long ttl = (req.ttlSec() == null) ? 60L : req.ttlSec();
+    if (ttl < 30L || ttl > 3600L) ttl = 60L; // 최소 30초, 최대 1시간 범위 내  ,임시 1분
 
     String jwt = service.createJoinToken(room, identity, name, ttl);
 
