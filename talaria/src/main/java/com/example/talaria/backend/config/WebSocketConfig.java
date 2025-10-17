@@ -20,6 +20,6 @@ public class WebSocketConfig implements WebSocketConfigurer {
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(handler, "/ws/subtitles")
                 .addInterceptors(auth)
-                .setAllowedOrigins("http://localhost:3000", "http://127.0.0.1:3000");
+                .setAllowedOrigins("https://localhost:3000", "https://127.0.0.1:3000","https://192.168.70.154:3000");
     }
 }
