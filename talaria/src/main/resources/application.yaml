@@ -25,3 +25,7 @@ livekit:
   apiUrl: "${LIVEKIT_API_URL:${LIVEKIT_URL}}"
   apiKey: "${LIVEKIT_API_KEY}"
   apiSecret: "${LIVEKIT_API_SECRET}"
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true

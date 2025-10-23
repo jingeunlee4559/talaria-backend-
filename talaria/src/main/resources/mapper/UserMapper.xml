@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.talaria.backend.mapper.user.UserMapper">
+
+  <!-- 스키마/테이블/PK는 설계서에 맞게 교체 -->
+  <select id="selectById" parameterType="long" resultType="map">
+    SELECT * FROM tl_users WHERE user_id = #{id}
+  </select>
+
+  <select id="countAll" resultType="long">
+    SELECT COUNT(*) FROM tl_users
+  </select>
+
+  <select id="selectPage" resultType="map">
+    SELECT * FROM tl_users
+    ORDER BY user_id DESC
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+</mapper>

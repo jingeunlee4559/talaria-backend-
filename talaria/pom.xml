@@ -78,6 +78,12 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-jdbc</artifactId>
     </dependency>
+    <!-- MyBatis + Spring Boot -->
+  <dependency>
+    <groupId>org.mybatis.spring.boot</groupId>
+    <artifactId>mybatis-spring-boot-starter</artifactId>
+    <version>3.0.5</version>
+  </dependency>
     <!-- 사용 DB 드라이버: MySQL 예시 -->
   <dependency>
     <groupId>com.mysql</groupId>
