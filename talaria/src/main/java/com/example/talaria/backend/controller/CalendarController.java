@@ -16,7 +16,7 @@ public class CalendarController {
     private final CalendarQueryService service;
 
     @GetMapping("/events/{id}")
-    public ResponseEntity<Map<String,Object>> getById(@PathVariable long id){
+    public ResponseEntity<Map<String,Object>> getById(@PathVariable("id") long id){
         return ResponseEntity.ok(service.findById(id));
     }
 

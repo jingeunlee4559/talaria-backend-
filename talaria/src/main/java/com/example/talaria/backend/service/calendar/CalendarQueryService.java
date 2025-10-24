@@ -15,8 +15,8 @@ public class CalendarQueryService {
     private final CalendarMapper mapper;
 
     // 🔧 여기를 설계서 값으로 교체
-    private static final String TABLE = "tl_calendar";   // 예시: 실제 테이블명으로
-    private static final String PK    = "calendar_id";   // 예시: 실제 PK 컬럼명으로
+    private static final String TABLE = "tl_calender";   // 예시: 실제 테이블명으로
+    private static final String PK    = "event_id";   // 예시: 실제 PK 컬럼명으로
 
     public Map<String, Object> findById(long id) {
         var row = mapper.selectById(TABLE, PK, id);

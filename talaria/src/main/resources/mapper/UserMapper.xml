@@ -19,4 +19,13 @@
     LIMIT #{limit} OFFSET #{offset}
   </select>
 
+  <select id="findByEmail" parameterType="String" resultType="com.example.talaria.backend.model.User">
+        SELECT 
+              *
+        FROM 
+            tl_users
+        WHERE 
+            email = #{email}
+    </select>
+
 </mapper>
