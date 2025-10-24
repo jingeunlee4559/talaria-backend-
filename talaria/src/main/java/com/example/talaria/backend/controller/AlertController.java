@@ -2,6 +2,7 @@ package com.example.talaria.backend.controller;
 
 import com.example.talaria.backend.dto.common.PageResponse;
 import com.example.talaria.backend.service.alert.AlertService;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -19,37 +20,47 @@ public class AlertController {
 
     @GetMapping
     public ResponseEntity<PageResponse> list(
-            @PathVariable long userId,
-            @RequestParam(required = false) String alertId,
-            @RequestParam(required = false) String status,  // PENDING/SENT/SEEN
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @PathVariable("userId") long userId,
+            @RequestParam(name = "alertId", required = false) String alertId,
+            @RequestParam(name = "status",  required = false) String status,   // PENDING/SENT/SEEN
+            @RequestParam(name = "page",    defaultValue = "0")  int page,
+            @RequestParam(name = "size",    defaultValue = "20") int size) {
+
         Long idNullable = (alertId == null || alertId.isBlank()) ? null : Long.parseLong(alertId);
         return ResponseEntity.ok(service.listByUser(userId, idNullable, status, page, size));
     }
 
     @PostMapping
     public ResponseEntity<Map<String,Object>> create(
-            @PathVariable long userId,
-            @RequestBody CreateAlertReq req) {
+            @PathVariable("userId") long userId,
+            @RequestBody @Valid CreateAlertReq req) {
+
         return ResponseEntity.ok(
             service.create(userId, req.getType(), req.getTitle(), req.getBody(), req.getPayloadJson()));
     }
 
     @PatchMapping("/{id}/delivered")
-    public ResponseEntity<Map<String,Object>> delivered(@PathVariable long userId, @PathVariable long id){
+    public ResponseEntity<Map<String,Object>> delivered(
+            @PathVariable("userId") long userId,
+            @PathVariable("id") long id) {
+
         int n = service.markDelivered(userId, id);
         return ResponseEntity.ok(Map.of("updated", n));
     }
 
     @PatchMapping("/{id}/seen")
-    public ResponseEntity<Map<String,Object>> seen(@PathVariable long userId, @PathVariable long id){
+    public ResponseEntity<Map<String,Object>> seen(
+            @PathVariable("userId") long userId,
+            @PathVariable("id") long id) {
+
         int n = service.markSeen(userId, id);
         return ResponseEntity.ok(Map.of("updated", n));
     }
 
     @PatchMapping("/seen")
-    public ResponseEntity<Map<String,Object>> seenAll(@PathVariable long userId){
+    public ResponseEntity<Map<String,Object>> seenAll(
+            @PathVariable("userId") long userId) {
+
         int n = service.markAllSeen(userId);
         return ResponseEntity.ok(Map.of("updated", n));
     }
