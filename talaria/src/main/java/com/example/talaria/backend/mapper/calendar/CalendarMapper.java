@@ -2,19 +2,26 @@ package com.example.talaria.backend.mapper.calendar;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
 @Mapper
 public interface CalendarMapper {
-    Map<String, Object> selectById(@Param("table") String table,
-                                   @Param("pk") String pk,
-                                   @Param("id") long id);
+  long countByUser(@Param("table") String table,
+                   @Param("pk")    String pk,
+                   @Param("userId") long userId,
+                   @Param("eventId") Long eventId,
+                   @Param("from") java.time.LocalDateTime from,
+                   @Param("to")   java.time.LocalDateTime to);
 
-    long count(@Param("table") String table);
-
-    List<Map<String, Object>> selectPage(@Param("table") String table,
-                                         @Param("pk") String pk,
-                                         @Param("limit") int limit,
-                                         @Param("offset") int offset);
+  List<Map<String, Object>> selectPageByUser(@Param("table") String table,
+                                             @Param("pk")    String pk,
+                                             @Param("userId") long userId,
+                                             @Param("eventId") Long eventId,
+                                             @Param("from") java.time.LocalDateTime from,
+                                             @Param("to")   java.time.LocalDateTime to,
+                                             @Param("limit") int limit,
+                                             @Param("offset") int offset);
 }

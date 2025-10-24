@@ -2,18 +2,46 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.talaria.backend.mapper.todo.TodoMapper">
 
-  <select id="selectById" resultType="map">
-    SELECT * FROM ${table} WHERE ${pk} = #{id}
+  <!-- ⚠ 설계서 기준: 테이블/컬럼명 정확히 치환 -->
+  <!-- 예: tl_todo_tasks(task_id, user_id, title, status, due_date, created_at) -->
+
+  <select id="countByUser" resultType="long">
+    SELECT COUNT(*)
+    FROM tl_todo_tasks
+    WHERE user_id = #{userId}
+    <if test="status != null and status != ''">
+      AND status = #{status}
+    </if>
+    <if test="from != null">
+      AND due_date &gt;= #{from}
+    </if>
+    <if test="to != null">
+      AND due_date &lt;= #{to}
+    </if>
   </select>
 
-  <select id="count" resultType="long">
-    SELECT COUNT(*) FROM ${table}
-  </select>
-
-  <select id="selectPage" resultType="map">
-    SELECT * FROM ${table}
-    ORDER BY ${pk} DESC
+  <select id="selectPageByUser" resultType="map">
+    SELECT task_id, user_id, title, status, due_date, created_at
+    FROM tl_todo_tasks
+    WHERE user_id = #{userId}
+    <if test="status != null and status != ''">
+      AND status = #{status}
+    </if>
+    <if test="from != null">
+      AND due_date &gt;= #{from}
+    </if>
+    <if test="to != null">
+      AND due_date &lt;= #{to}
+    </if>
+    ORDER BY task_id DESC
     LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="selectOneByUser" resultType="map">
+    SELECT task_id, user_id, title, status, due_date, created_at
+    FROM tl_todo_tasks
+    WHERE task_id = #{taskId}
+      AND user_id = #{userId}
   </select>
 
 </mapper>

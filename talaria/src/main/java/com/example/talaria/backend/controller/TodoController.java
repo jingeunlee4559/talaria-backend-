@@ -6,23 +6,29 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/todos")
+@RequestMapping("/api/users/{userId}/todos")
 public class TodoController {
 
     private final TodoQueryService service;
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Map<String,Object>> getById(@PathVariable long id){
-        return ResponseEntity.ok(service.findById(id));
+    @GetMapping
+    public ResponseEntity<PageResponse> listByUser(@PathVariable long userId,
+                                                   @RequestParam(defaultValue = "0") int page,
+                                                   @RequestParam(defaultValue = "20") int size,
+                                                   @RequestParam(required = false) String status,
+                                                   @RequestParam(required = false) LocalDate due_from,
+                                                   @RequestParam(required = false) LocalDate due_to) {
+        return ResponseEntity.ok(service.listByUser(userId, page, size, status, due_from, due_to));
     }
 
-    @GetMapping
-    public ResponseEntity<PageResponse> getPage(@RequestParam(defaultValue = "0") int page,
-                                                @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(service.findPage(page, size));
+    @GetMapping("/{taskId}")
+    public ResponseEntity<Map<String, Object>> getOne(@PathVariable long userId,
+                                                      @PathVariable long taskId) {
+        return ResponseEntity.ok(service.getOneByUser(userId, taskId));
     }
 }

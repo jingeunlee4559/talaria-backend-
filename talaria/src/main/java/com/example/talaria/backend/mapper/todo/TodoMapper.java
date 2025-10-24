@@ -1,21 +1,27 @@
+// src/main/java/com/example/talaria/backend/mapper/todo/TodoMapper.java
 package com.example.talaria.backend.mapper.todo;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
 @Mapper
 public interface TodoMapper {
-    Map<String, Object> selectById(@Param("table") String table,
-                                   @Param("pk") String pk,
-                                   @Param("id") long id);
+    long countByUser(@Param("userId") long userId,
+                     @Param("status") String status,
+                     @Param("from") LocalDate from,
+                     @Param("to") LocalDate to);
 
-    long count(@Param("table") String table);
+    List<Map<String, Object>> selectPageByUser(@Param("userId") long userId,
+                                               @Param("status") String status,
+                                               @Param("from") LocalDate from,
+                                               @Param("to") LocalDate to,
+                                               @Param("limit") int limit,
+                                               @Param("offset") int offset);
 
-    List<Map<String, Object>> selectPage(@Param("table") String table,
-                                         @Param("pk") String pk,
-                                         @Param("limit") int limit,
-                                         @Param("offset") int offset);
+    Map<String, Object> selectOneByUser(@Param("userId") long userId,
+                                        @Param("taskId") long taskId);
 }
