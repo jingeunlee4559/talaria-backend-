@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.talaria.backend.mapper.alert.AlertMapper">
+
+  <select id="countByUser" resultType="long">
+    SELECT COUNT(*)
+    FROM ${table}
+    WHERE user_id = #{userId}
+    <if test="alertId != null">
+      AND ${pk} = #{alertId}
+    </if>
+    <if test="status != null and status != ''">
+      AND status = #{status}
+    </if>
+  </select>
+
+  <select id="selectPageByUser" resultType="map">
+    SELECT id, user_id, type, title, body, payload, status,
+           created_at, delivered_at, seen_at
+    FROM ${table}
+    WHERE user_id = #{userId}
+    <if test="alertId != null">
+      AND ${pk} = #{alertId}
+    </if>
+    <if test="status != null and status != ''">
+      AND status = #{status}
+    </if>
+    ORDER BY created_at DESC, ${pk} DESC
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO ${table}
+      (user_id, type, title, body, payload, status, created_at)
+    VALUES
+      (#{userId}, #{type}, #{title}, #{body},
+       <choose>
+         <when test="payloadJson != null and payloadJson != ''">
+           CAST(#{payloadJson} AS JSON)
+         </when>
+         <otherwise>NULL</otherwise>
+       </choose>,
+       'PENDING', NOW())
+  </insert>
+
+  <select id="lastInsertId" resultType="long">
+    SELECT LAST_INSERT_ID()
+  </select>
+
+  <!-- 최초 수신(delivered): PENDING -> SENT (idempotent: PENDING에서만 변화) -->
+  <update id="markDelivered">
+    UPDATE ${table}
+    SET status = 'SENT',
+        delivered_at = #{now}
+    WHERE ${pk} = #{id}
+      AND user_id = #{userId}
+      AND status = 'PENDING'
+  </update>
+
+  <!-- 읽음 처리: PENDING/SENT -> SEEN -->
+  <update id="markSeen">
+    UPDATE ${table}
+    SET status = 'SEEN',
+        seen_at = #{now}
+    WHERE ${pk} = #{id}
+      AND user_id = #{userId}
+      AND status IN ('PENDING','SENT')
+  </update>
+
+  <!-- 일괄 읽음 처리 -->
+  <update id="markAllSeen">
+    UPDATE ${table}
+    SET status = 'SEEN',
+        seen_at = #{now}
+    WHERE user_id = #{userId}
+      AND status IN ('PENDING','SENT')
+  </update>
+
+</mapper>
