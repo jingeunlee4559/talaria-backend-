@@ -7,11 +7,16 @@ import jakarta.validation.constraints.*;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.net.URI;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 
 @RestController
@@ -37,34 +42,53 @@ public class DocumentController {
         return ResponseEntity.ok(service.getOneByUser(userId, docId));
     }
 
-    @PostMapping
-    public ResponseEntity<?> create(
-            @PathVariable("userId") long userId,
-            @RequestBody @Valid CreateDocumentReq req) {
-        try {
-            var created = service.create(
-                    userId,
-                    req.getMeetingId(),
-                    req.getOriginalName(),
-                    req.getFilepath(),
-                    req.getMimeType(),
-                    req.getSize(),
-                    req.getSha256(),
-                    req.getOriginalLang(),
-                    req.getStorageKey()
-            );
-            return ResponseEntity.ok(created);
-        } catch (IllegalStateException ex) {
-            // UNIQUE 위반 등 → 409 Conflict로 변환
-            var pd = ProblemDetail.forStatus(409);
-            pd.setTitle("Conflict");
-            pd.setDetail("Duplicate filepath or constraint violation");
-            pd.setInstance(URI.create("/api/users/" + userId + "/documents"));
-            return ResponseEntity.status(409).body(Map.of(
-                    "type","about:blank","title",pd.getTitle(),"status",409,"detail",pd.getDetail(),"instance",pd.getInstance().toString()
-            ));
+@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+public ResponseEntity<?> create(
+        @PathVariable("userId") long userId,
+        @RequestPart("file") MultipartFile file,
+        @RequestParam("original_name") String originalName,
+        @RequestParam(value = "meeting_id", required = false) Long meetingId
+) {
+    try {
+        // SHA-256 해시 계산
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hashBytes = digest.digest(file.getBytes());
+        StringBuilder sb = new StringBuilder();
+        for (byte b : hashBytes) {
+            sb.append(String.format("%02x", b));
         }
+        String sha256 = sb.toString();
+
+        // 파일 저장 로직
+        var created = service.create(
+                userId,
+                meetingId,
+                originalName,
+                file.getOriginalFilename(),
+                file.getContentType(),
+                file.getSize(),
+                sha256,
+                "ko", // originalLang 고정 예시
+                "storageKeyExample" // storageKey 예시
+        );
+
+        return ResponseEntity.ok(created);
+    } catch (IllegalStateException ex) {
+        var pd = ProblemDetail.forStatus(409);
+        pd.setTitle("Conflict");
+        pd.setDetail("Duplicate filepath or constraint violation");
+        pd.setInstance(URI.create("/api/users/" + userId + "/documents"));
+        return ResponseEntity.status(409).body(Map.of(
+                "type", "about:blank",
+                "title", pd.getTitle(),
+                "status", 409,
+                "detail", pd.getDetail(),
+                "instance", pd.getInstance().toString()
+        ));
+    } catch (IOException | NoSuchAlgorithmException e) {
+        return ResponseEntity.status(500).body(Map.of("error", "파일 처리 중 오류 발생"));
     }
+}
 
     @DeleteMapping("/{docId}")
     public ResponseEntity<Map<String,Object>> delete(
