@@ -17,27 +17,33 @@
   <!-- 페이지 조회 -->
   <select id="selectPageByUser" resultType="map">
     SELECT
-      doc_id, uploader_user_id, meeting_id,
-      original_name, filepath, mime_type, size,
-      sha256, original_lang, storage_key, uploaded_at
-    FROM ${table}
-    WHERE uploader_user_id = #{userId}
+      d.doc_id, d.uploader_user_id,
+      u.name AS uploader_name,
+      d.meeting_id,
+      d.original_name, d.filepath, d.mime_type, d.size,
+      d.sha256, d.original_lang, d.storage_key, d.uploaded_at
+    FROM ${table} d
+    LEFT JOIN tl_users u ON u.user_id = d.uploader_user_id
+    WHERE d.uploader_user_id = #{userId}
     <if test="meetingId != null">
-      AND meeting_id = #{meetingId}
+      AND d.meeting_id = #{meetingId}
     </if>
-    ORDER BY uploaded_at DESC, doc_id DESC
+    ORDER BY d.uploaded_at DESC, d.doc_id DESC
     LIMIT #{limit} OFFSET #{offset}
   </select>
 
   <!-- 단건 조회 -->
   <select id="selectOneByUser" resultType="map">
     SELECT
-      doc_id, uploader_user_id, meeting_id,
-      original_name, filepath, mime_type, size,
-      sha256, original_lang, storage_key, uploaded_at
-    FROM ${table}
-    WHERE doc_id = #{docId}
-      AND uploader_user_id = #{userId}
+      d.doc_id, d.uploader_user_id,
+      u.name AS uploader_name,                        
+      d.meeting_id,
+      d.original_name, d.filepath, d.mime_type, d.size,
+      d.sha256, d.original_lang, d.storage_key, d.uploaded_at
+    FROM ${table} d
+    LEFT JOIN tl_users u ON u.user_id = d.uploader_user_id
+    WHERE d.doc_id = #{docId}
+      AND d.uploader_user_id = #{userId}
   </select>
 
   <!-- 생성 -->
