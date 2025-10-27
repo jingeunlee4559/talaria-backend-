@@ -4,36 +4,39 @@
   "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.talaria.backend.mapper.alert.AlertMapper">
 
+  <!-- countByUser -->
   <select id="countByUser" resultType="long">
-    SELECT COUNT(*)
-    FROM ${table}
+    SELECT COUNT(*) FROM ${table}
     WHERE user_id = #{userId}
-    <if test="alertId != null">
-      AND ${pk} = #{alertId}
-    </if>
-    <if test="status != null and status != ''">
-      AND status = #{status}
-    </if>
+    <if test="alertId != null"> AND ${pk} = #{alertId} </if>
+    <if test="status != null and status != ''"> AND status = #{status} </if>
   </select>
 
+  <!-- selectPageByUser -->
   <select id="selectPageByUser" resultType="map">
-    SELECT id, user_id, type, title, body, payload, status,
+    SELECT ${pk} AS id, user_id, `type`, title, body, payload, status,
            created_at, delivered_at, seen_at
     FROM ${table}
     WHERE user_id = #{userId}
-    <if test="alertId != null">
-      AND ${pk} = #{alertId}
-    </if>
-    <if test="status != null and status != ''">
-      AND status = #{status}
-    </if>
+    <if test="alertId != null"> AND ${pk} = #{alertId} </if>
+    <if test="status != null and status != ''"> AND status = #{status} </if>
     ORDER BY created_at DESC, ${pk} DESC
     LIMIT #{limit} OFFSET #{offset}
   </select>
 
-  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+  <!-- : selectOneByUser -->
+  <select id="selectOneByUser" resultType="map">
+    SELECT ${pk} AS id, user_id, status, delivered_at, seen_at
+    FROM ${table}
+    WHERE ${pk} = #{id}
+      AND user_id = #{userId}
+    LIMIT 1
+  </select>
+
+  <!-- insert: 키반환은 lastInsertId로 처리 -->
+  <insert id="insert">
     INSERT INTO ${table}
-      (user_id, type, title, body, payload, status, created_at)
+      (user_id, `type`, title, body, payload, status, created_at)
     VALUES
       (#{userId}, #{type}, #{title}, #{body},
        <choose>
@@ -45,37 +48,45 @@
        'PENDING', NOW())
   </insert>
 
+  <!--  lastInsertId -->
   <select id="lastInsertId" resultType="long">
     SELECT LAST_INSERT_ID()
   </select>
 
-  <!-- 최초 수신(delivered): PENDING -> SENT (idempotent: PENDING에서만 변화) -->
+  <!-- delivered -->
   <update id="markDelivered">
     UPDATE ${table}
     SET status = 'SENT',
-        delivered_at = #{now}
+        delivered_at = COALESCE(delivered_at, #{now})
     WHERE ${pk} = #{id}
       AND user_id = #{userId}
       AND status = 'PENDING'
   </update>
 
-  <!-- 읽음 처리: PENDING/SENT -> SEEN -->
+  <!-- seen -->
   <update id="markSeen">
     UPDATE ${table}
     SET status = 'SEEN',
-        seen_at = #{now}
+        seen_at = CASE WHEN seen_at IS NULL THEN #{now} ELSE seen_at END
     WHERE ${pk} = #{id}
       AND user_id = #{userId}
-      AND status IN ('PENDING','SENT')
   </update>
 
-  <!-- 일괄 읽음 처리 -->
+  <!-- all seen -->
   <update id="markAllSeen">
     UPDATE ${table}
     SET status = 'SEEN',
-        seen_at = #{now}
+        seen_at = COALESCE(seen_at, #{now})
     WHERE user_id = #{userId}
       AND status IN ('PENDING','SENT')
   </update>
+
+  <!--  countUnreadByUser -->
+  <select id="countUnreadByUser" resultType="long">
+    SELECT COUNT(*)
+    FROM ${table}
+    WHERE user_id = #{userId}
+      AND status IN ('PENDING','SENT')
+  </select>
 
 </mapper>

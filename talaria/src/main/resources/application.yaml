@@ -7,25 +7,43 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  jackson:
+    time-zone: Asia/Seoul
+    serialization:
+      write-dates-as-timestamps: false
+
+  servlet:
+    multipart:
+      max-file-size: 200MB
+      max-request-size: 200MB 
+
 server:
-  address: 0.0.0.0     
+  address: 0.0.0.0
   port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
 
 talaria:
   aiBaseUrl: "https://127.0.0.1:8000"
   sessionTtlSeconds: 60
-
-cors:
-  # React 서버 IP를 명시 (다른 PC에서도 접속 가능)
-  # 예: 개발 PC IP가 192.168.0.15라면
-  allowed-origins: "https://192.168.70.154:3000,https://localhost:3000,https://127.0.0.1:3000"
 
 livekit:
   wsUrl: "${LIVEKIT_WS_URL:${LIVEKIT_URL}}"
   apiUrl: "${LIVEKIT_API_URL:${LIVEKIT_URL}}"
   apiKey: "${LIVEKIT_API_KEY}"
   apiSecret: "${LIVEKIT_API_SECRET}"
+
 mybatis:
   mapper-locations: classpath:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
+    # 개발 중엔 StdOutImpl이 SQL을 터미널에 확실히 뿌려줌 (선택)
+    # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+logging:
+  level:
+    org.apache.ibatis: TRACE
+    org.mybatis.spring.SqlSessionUtils: DEBUG
+    org.springframework.jdbc.core: DEBUG

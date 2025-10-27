@@ -25,23 +25,4 @@ public class AppConfig {
     //             .build();
     // }
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration cfg = new CorsConfiguration();
-
-        // "http://localhost:3000,http://127.0.0.1:3000" 형태를 리스트로 분리
-        List<String> origins = Arrays.stream(corsOriginsRaw.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-
-        cfg.setAllowedOrigins(origins.isEmpty() ? List.of("*") : origins);
-        cfg.addAllowedHeader(CorsConfiguration.ALL);
-        cfg.addAllowedMethod(CorsConfiguration.ALL);
-        cfg.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", cfg);
-        return source;
-    }
 }

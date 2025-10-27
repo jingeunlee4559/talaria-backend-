@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.talaria.backend.mapper.document.DocumentMapper">
+
+  <select id="countByUser" resultType="long">
+    SELECT COUNT(*)
+    FROM ${table}
+    WHERE uploader_user_id = #{userId}
+    <if test="meetingId != null">
+      AND meeting_id = #{meetingId}
+    </if>
+  </select>
+
+  <select id="selectPageByUser" resultType="map">
+    SELECT doc_id, uploader_user_id, meeting_id,
+           original_name, filepath, mime_type, size,
+           sha256, original_lang, storage_key, uploaded_at
+    FROM ${table}
+    WHERE uploader_user_id = #{userId}
+    <if test="meetingId != null">
+      AND meeting_id = #{meetingId}
+    </if>
+    ORDER BY uploaded_at DESC, ${pk} DESC
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="selectOneByUser" resultType="map">
+    SELECT doc_id, uploader_user_id, meeting_id,
+           original_name, filepath, mime_type, size,
+           sha256, original_lang, storage_key, uploaded_at
+    FROM ${table}
+    WHERE ${pk} = #{docId}
+      AND uploader_user_id = #{userId}
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="doc_id">
+    INSERT INTO ${table}
+      (uploader_user_id, meeting_id, original_name, filepath,
+       mime_type, size, sha256, original_lang, storage_key, uploaded_at)
+    VALUES
+      (#{userId}, #{meetingId}, #{originalName}, #{filepath},
+       #{mimeType}, #{size}, #{sha256}, #{originalLang}, #{storageKey}, CURRENT_TIMESTAMP)
+  </insert>
+
+  <select id="lastInsertId" resultType="long">
+    SELECT LAST_INSERT_ID()
+  </select>
+
+  <delete id="deleteByUser">
+    DELETE FROM ${table}
+    WHERE ${pk} = #{docId}
+      AND uploader_user_id = #{userId}
+  </delete>
+
+</mapper>
