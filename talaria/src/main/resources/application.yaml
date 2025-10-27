@@ -15,7 +15,7 @@ spring:
   servlet:
     multipart:
       max-file-size: 200MB
-      max-request-size: 200MB 
+      max-request-size: 200MB
 
 server:
   address: 0.0.0.0
@@ -38,8 +38,6 @@ mybatis:
   mapper-locations: classpath:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
-    # 개발 중엔 StdOutImpl이 SQL을 터미널에 확실히 뿌려줌 (선택)
-    # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
 
 logging:
@@ -47,3 +45,7 @@ logging:
     org.apache.ibatis: TRACE
     org.mybatis.spring.SqlSessionUtils: DEBUG
     org.springframework.jdbc.core: DEBUG
+
+storage:
+  documents:
+    root: ${DOC_STORAGE_ROOT:./data/uploads/docs}

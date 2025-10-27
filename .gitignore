@@ -35,3 +35,4 @@ build/
 talaria/src/main/resources/application.yaml
 *.yaml
 .env
+data/uploads/docs/
