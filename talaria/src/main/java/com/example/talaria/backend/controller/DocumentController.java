@@ -62,7 +62,7 @@ public class DocumentController {
             @RequestPart("file") MultipartFile file,
             @RequestParam(name = "original_name", required = false) String originalName,
             @RequestParam(name = "meeting_id",  required = false) Long meetingId,
-            @RequestParam(name = "originalLang", defaultValue = "ko") String originalLang
+            @RequestParam(name = "original_lang", defaultValue = "ko") String originalLang
     ) {
         if (file == null || file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(
