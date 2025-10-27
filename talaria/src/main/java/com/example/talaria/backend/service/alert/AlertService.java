@@ -45,12 +45,12 @@ public class AlertService {
 
     @Transactional
     public int markDelivered(long userId, long id) {
-        return mapper.markDelivered(TABLE, PK, userId, id, LocalDateTime.now()); // ✅ PK 전달
+        return mapper.markDelivered(TABLE, PK, userId, id, LocalDateTime.now());
     }
 
     @Transactional
     public int markSeen(long userId, long id) {
-        return mapper.markSeen(TABLE, PK, userId, id, LocalDateTime.now());      // ✅ PK 전달
+        return mapper.markSeen(TABLE, PK, userId, id, LocalDateTime.now());
     }
 
     @Transactional

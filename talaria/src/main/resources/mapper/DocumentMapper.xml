@@ -4,6 +4,7 @@
   "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.talaria.backend.mapper.document.DocumentMapper">
 
+  <!-- 총 개수 -->
   <select id="countByUser" resultType="long">
     SELECT COUNT(*)
     FROM ${table}
@@ -13,29 +14,34 @@
     </if>
   </select>
 
+  <!-- 페이지 조회 -->
   <select id="selectPageByUser" resultType="map">
-    SELECT doc_id, uploader_user_id, meeting_id,
-           original_name, filepath, mime_type, size,
-           sha256, original_lang, storage_key, uploaded_at
+    SELECT
+      doc_id, uploader_user_id, meeting_id,
+      original_name, filepath, mime_type, size,
+      sha256, original_lang, storage_key, uploaded_at
     FROM ${table}
     WHERE uploader_user_id = #{userId}
     <if test="meetingId != null">
       AND meeting_id = #{meetingId}
     </if>
-    ORDER BY uploaded_at DESC, ${pk} DESC
+    ORDER BY uploaded_at DESC, doc_id DESC
     LIMIT #{limit} OFFSET #{offset}
   </select>
 
+  <!-- 단건 조회 -->
   <select id="selectOneByUser" resultType="map">
-    SELECT doc_id, uploader_user_id, meeting_id,
-           original_name, filepath, mime_type, size,
-           sha256, original_lang, storage_key, uploaded_at
+    SELECT
+      doc_id, uploader_user_id, meeting_id,
+      original_name, filepath, mime_type, size,
+      sha256, original_lang, storage_key, uploaded_at
     FROM ${table}
-    WHERE ${pk} = #{docId}
+    WHERE doc_id = #{docId}
       AND uploader_user_id = #{userId}
   </select>
 
-  <insert id="insert" useGeneratedKeys="true" keyProperty="doc_id">
+  <!-- 생성 -->
+  <insert id="insert">
     INSERT INTO ${table}
       (uploader_user_id, meeting_id, original_name, filepath,
        mime_type, size, sha256, original_lang, storage_key, uploaded_at)
@@ -44,13 +50,15 @@
        #{mimeType}, #{size}, #{sha256}, #{originalLang}, #{storageKey}, CURRENT_TIMESTAMP)
   </insert>
 
+  <!-- 생성 직후 PK 회수 -->
   <select id="lastInsertId" resultType="long">
     SELECT LAST_INSERT_ID()
   </select>
 
+  <!-- 삭제(소유자 보장) -->
   <delete id="deleteByUser">
     DELETE FROM ${table}
-    WHERE ${pk} = #{docId}
+    WHERE doc_id = #{docId}
       AND uploader_user_id = #{userId}
   </delete>
 
