@@ -49,3 +49,10 @@ logging:
 storage:
   documents:
     root: ${DOC_STORAGE_ROOT:./data/uploads/docs}
+  transdocs:
+    root: ${DOC_STORAGE_ROOT:./data/uploads/transdocs}
+
+papago:
+  client-id: ${PAPAGO_CLIENT_ID:}
+  client-secret: ${PAPAGO_CLIENT_SECRET:}
+  n2mt-url: https://openapi.naver.com/v1/papago/n2mtwa

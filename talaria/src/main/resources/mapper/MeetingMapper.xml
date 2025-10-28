@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.talaria.backend.mapper.meeting.MeetingMapper">
+
+  <!-- 목록/카운트 -->
+  <select id="countByHost" resultType="long">
+    SELECT COUNT(*)
+    FROM ${table}
+    WHERE host_id = #{hostId}
+    <if test="status != null and status != ''">
+      AND status = #{status}
+    </if>
+    <if test="from != null">
+      AND scheduled_at &gt;= #{from}
+    </if>
+    <if test="to != null">
+      AND scheduled_at &lt;= #{to}
+    </if>
+  </select>
+
+  <select id="selectPageByHost" resultType="map">
+    SELECT meetings_id, host_id, title, status, invite_code,
+           default_lang, scheduled_at, created_at, updated_at, ended_at
+    FROM ${table}
+    WHERE host_id = #{hostId}
+    <if test="status != null and status != ''">
+      AND status = #{status}
+    </if>
+    <if test="from != null">
+      AND scheduled_at &gt;= #{from}
+    </if>
+    <if test="to != null">
+      AND scheduled_at &lt;= #{to}
+    </if>
+    ORDER BY scheduled_at DESC, meetings_id DESC
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- 단건 조회 (PK=meetings_id) -->
+  <select id="selectOneByHost" resultType="map">
+    SELECT meetings_id, host_id, title, status, invite_code,
+           default_lang, scheduled_at, created_at, updated_at, ended_at
+    FROM ${table}
+    WHERE ${pk} = #{id}        <!-- pk는 'meetings_id'로 들어옴 -->
+      AND host_id = #{hostId}
+  </select>
+
+  <!-- 초대코드로 조회 -->
+  <select id="selectByInviteCode" resultType="map">
+    SELECT meetings_id, host_id, title, status, invite_code,
+           default_lang, scheduled_at, created_at, updated_at, ended_at
+    FROM ${table}
+    WHERE invite_code = #{inviteCode}
+  </select>
+
+  <!-- 생성 (scheduled_at NOT NULL 값 필수) -->
+  <insert id="insert">
+    INSERT INTO ${table}
+      (host_id, title, status, invite_code, default_lang, scheduled_at)
+    VALUES
+      (#{hostId}, #{title}, #{status}, #{inviteCode}, #{defaultLang}, #{scheduledAt})
+  </insert>
+
+  <select id="lastInsertId" resultType="long">
+    SELECT LAST_INSERT_ID()
+  </select>
+
+  <!-- 부분 업데이트 -->
+  <update id="updatePartial">
+    UPDATE ${table}
+    <set>
+      <if test="title != null">        title = #{title},</if>
+      <if test="status != null">       status = #{status},</if>
+      <if test="inviteCode != null">   invite_code = #{inviteCode},</if>
+      <if test="defaultLang != null">  default_lang = #{defaultLang},</if>
+      <if test="scheduledAt != null">  scheduled_at = #{scheduledAt},</if>
+      <if test="endedAt != null">      ended_at = #{endedAt},</if>
+    </set>
+    WHERE ${pk} = #{id} AND host_id = #{hostId}
+  </update>
+
+  <update id="markOngoing">
+    UPDATE ${table}
+    SET status = 'ONGOING'
+    WHERE ${pk} = #{id} AND host_id = #{hostId}
+  </update>
+
+  <update id="markEnded">
+    UPDATE ${table}
+    SET status = 'ENDED', ended_at = #{endedAt}
+    WHERE ${pk} = #{id} AND host_id = #{hostId}
+  </update>
+
+  <update id="setInviteCode">
+    UPDATE ${table}
+    SET invite_code = #{inviteCode}
+    WHERE ${pk} = #{id} AND host_id = #{hostId}
+  </update>
+
+</mapper>
