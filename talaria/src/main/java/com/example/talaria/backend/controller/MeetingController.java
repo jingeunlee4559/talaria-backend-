@@ -5,6 +5,7 @@ import com.example.talaria.backend.dto.common.PageResponse;
 import com.example.talaria.backend.service.meeting.MeetingService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -56,27 +57,50 @@ public class MeetingController {
 
     // 생성
     @PostMapping
-    public ResponseEntity<?> create(
-            @PathVariable("userId") long userId,
-            @RequestBody @Valid CreateMeetingReq req) {
-        try {
-            var created = service.create(userId, req.getTitle(),
-                    req.getDefaultLang(), req.getScheduledAt());
-            return ResponseEntity.ok(created);
-        } catch (IllegalStateException e) {
-            var pd = ProblemDetail.forStatus(409);
-            pd.setTitle("Conflict");
-            pd.setDetail(e.getMessage());
-            pd.setInstance(URI.create("/api/users/" + userId + "/meetings"));
-            return ResponseEntity.status(409).body(Map.of(
-                    "type", "about:blank",
-                    "title", pd.getTitle(),
-                    "status", 409,
-                    "detail", pd.getDetail(),
-                    "instance", pd.getInstance().toString()
-            ));
-        }
+public ResponseEntity<?> create(
+        @PathVariable("userId") long userId,
+        @RequestBody @Valid CreateMeetingReq req) {
+    try {
+        // DTO에서 defaultLang/scheduledAt 보정(빈값/널 방지)
+        String defaultLang = (req.getDefaultLang() == null || req.getDefaultLang().isBlank())
+                ? "ko" : req.getDefaultLang();
+        var when = (req.getScheduledAt() != null)
+                ? req.getScheduledAt()
+                : LocalDateTime.now(); // 혹시 모를 누락 방지
+
+        var created = service.createNew(userId, req.getTitle(), defaultLang, when);
+        return ResponseEntity.ok(created);
+
+    } catch (org.springframework.dao.DataIntegrityViolationException e) {
+        // FK(host_id), UNIQUE 등 제약 위반을 400으로 명시
+        var pd = ProblemDetail.forStatus(400);
+        pd.setTitle("Bad Request");
+        pd.setDetail("Invalid host_id (user not found) or constraint violation.");
+        pd.setInstance(URI.create("/api/users/" + userId + "/meetings"));
+        return ResponseEntity.status(400).body(Map.of(
+                "type", "about:blank",
+                "title", pd.getTitle(),
+                "status", 400,
+                "detail", pd.getDetail(),
+                "instance", pd.getInstance().toString()
+        ));
+
+    } catch (IllegalStateException e) {
+        // 초대코드 생성 충돌 재시도 실패 등
+        var pd = ProblemDetail.forStatus(409);
+        pd.setTitle("Conflict");
+        pd.setDetail(e.getMessage());
+        pd.setInstance(URI.create("/api/users/" + userId + "/meetings"));
+        return ResponseEntity.status(409).body(Map.of(
+                "type", "about:blank",
+                "title", pd.getTitle(),
+                "status", 409,
+                "detail", pd.getDetail(),
+                "instance", pd.getInstance().toString()
+        ));
     }
+}
+
 
     // 부분 수정(제목/언어/시간/상태 등)
     @PatchMapping("/{id}")
@@ -120,11 +144,15 @@ public class MeetingController {
     public static class CreateMeetingReq {
         @NotBlank @Size(max = 200)
         private String title;
+
         @Size(max = 10)
         private String defaultLang = "ko";
+
+        @NotNull
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-        private LocalDateTime scheduledAt; // NOT NULL
+        private LocalDateTime scheduledAt;
     }
+
 
     @Data
     public static class PatchMeetingReq {

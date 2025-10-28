@@ -1,4 +1,3 @@
-// src/main/java/com/example/talaria/backend/mapper/meeting/MeetingMapper.java
 package com.example.talaria.backend.mapper.meeting;
 
 import org.apache.ibatis.annotations.Mapper;
@@ -70,4 +69,9 @@ public interface MeetingMapper {
                       @Param("id") long id,
                       @Param("hostId") long hostId,
                       @Param("inviteCode") String inviteCode);
+
+    Map<String,Object> selectRecentActiveByHostAndTitle(@Param("table") String table,
+                                                        @Param("hostId") long hostId,
+                                                        @Param("title") String title,
+                                                        @Param("since") LocalDateTime since);
 }

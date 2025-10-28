@@ -43,7 +43,7 @@
     SELECT meetings_id, host_id, title, status, invite_code,
            default_lang, scheduled_at, created_at, updated_at, ended_at
     FROM ${table}
-    WHERE ${pk} = #{id}        <!-- pk는 'meetings_id'로 들어옴 -->
+    WHERE ${pk} = #{id}
       AND host_id = #{hostId}
   </select>
 
@@ -98,5 +98,17 @@
     SET invite_code = #{inviteCode}
     WHERE ${pk} = #{id} AND host_id = #{hostId}
   </update>
+
+  <select id="selectRecentActiveByHostAndTitle" resultType="map">
+    SELECT meetings_id, host_id, title, status, invite_code,
+           default_lang, scheduled_at, created_at, updated_at, ended_at
+    FROM ${table}
+    WHERE host_id = #{hostId}
+      AND title = #{title}
+      AND status IN ('SCHEDULED','ONGOING')
+      AND created_at &gt;= #{since}
+    ORDER BY created_at DESC
+    LIMIT 1
+  </select>
 
 </mapper>

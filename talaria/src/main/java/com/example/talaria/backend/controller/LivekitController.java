@@ -100,11 +100,11 @@ public class LivekitController {
         meeting = meetingService.getByInviteCode(req.room());
         if (meeting == null || meeting.isEmpty()) {
           // 없으면 새로 생성(여기서 invite_code는 서비스 내부 랜덤 생성)
-          meeting = meetingService.create(hostId, title, defaultLang, scheduledAt);
+          meeting = meetingService.createNew(hostId, title, defaultLang, scheduledAt);
         }
       } else {
         // 2’) room이 없으면 무조건 새로 생성(랜덤 invite_code)
-        meeting = meetingService.create(hostId, title, defaultLang, scheduledAt);
+        meeting = meetingService.createNew(hostId, title, defaultLang, scheduledAt);
       }
     } catch (Exception e) {
       var pd = ProblemDetail.forStatus(500);
