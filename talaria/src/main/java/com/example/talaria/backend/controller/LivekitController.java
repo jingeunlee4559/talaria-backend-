@@ -3,7 +3,11 @@ package com.example.talaria.backend.controller;
 import com.example.talaria.backend.config.LivekitConfig;
 import com.example.talaria.backend.service.LivekitService;
 import com.example.talaria.backend.service.meeting.MeetingService;
+import com.example.talaria.backend.service.meeting.ParticipantService;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,32 +26,40 @@ public class LivekitController {
   private final LivekitConfig cfg;
   private final MeetingService meetingService;
 
-  // room: 선택(있으면 기존 회의 조회에만 사용, 생성에는 사용하지 않음)
+  @Autowired(required = false)
+  private ParticipantService participantService; // 선택 주입
+
+  /**
+   * 요청 DTO
+   * - room: 선택. 있으면 그 invite_code로 입장 시도. 없으면 새 회의 생성(호스트만).
+   * - hostId: 새 회의 생성 시 필수(기존 회의 입장만 할 땐 불필요).
+   * - userId: 참가자 테이블 기록용(선택).
+   */
   public record TokenReq(
       String room,
       String identity,
       String name,
-      Long ttlSec,
-      Long hostId,
+      @JsonProperty("ttlSec") @JsonAlias("ttl_sec") Long ttlSec,
+      @JsonProperty("hostId") @JsonAlias("host_id") Long hostId,
       String title,
-      String defaultLang
+      String defaultLang,
+      @JsonProperty("userId") @JsonAlias("user_id") Long userId
   ) {}
 
   public record TokenRes(
       String wsUrl,
       String token,
-      String room,          // = 최종 사용되는 invite_code
+      String room,          // 최종 invite_code
       String identity,
       long ttlSec,
       Map<String,Object> meeting
   ) {}
 
-  // identity만 강하게 검증. room은 선택값이므로 주면만 형식검증.
   private static final Pattern VALID = Pattern.compile("^[A-Za-z0-9_-]{1,64}$");
 
   @PostMapping("/token")
   public ResponseEntity<?> issue(@RequestBody TokenReq req) {
-    // 0) LiveKit 설정 체크
+    // 0) LiveKit 설정 확인
     if (isBlank(cfg.getWsUrl()) || isBlank(cfg.getApiUrl())
         || isBlank(cfg.getApiKey()) || isBlank(cfg.getApiSecret())) {
       return ResponseEntity.status(503).body(Map.of(
@@ -69,13 +81,6 @@ public class LivekitController {
           "message", "identity must match [A-Za-z0-9_-], length 1..64"
       ));
     }
-    if (req.hostId() == null || req.hostId() <= 0) {
-      return ResponseEntity.badRequest().body(Map.of(
-          "error", "invalid_args",
-          "message", "hostId is required and must be > 0"
-      ));
-    }
-    // room이 전달되면 형식만 확인(생성에는 사용하지 않음)
     if (!isBlank(req.room()) && !VALID.matcher(req.room()).matches()) {
       return ResponseEntity.badRequest().body(Map.of(
           "error", "invalid_args",
@@ -83,28 +88,46 @@ public class LivekitController {
       ));
     }
 
-    final long hostId = req.hostId();
-    final String identity = req.identity();
-    final String name = (req.name() == null || req.name().isBlank()) ? "Guest" : trim(req.name(), 64);
-    final long ttl = normalizeTtl(req.ttlSec());
+    long ttl = normalizeTtl(req.ttlSec());
+    String identity = req.identity();
+    String displayName = isBlank(req.name()) ? "Guest" : trim(req.name(), 64);
 
-    final String title = isBlank(req.title()) ? "New Meeting" : trim(req.title(), 200);
-    final String defaultLang = isBlank(req.defaultLang()) ? "ko" : trim(req.defaultLang(), 10);
-    final LocalDateTime scheduledAt = LocalDateTime.now();
-
+    // 2) 회의 선택/생성
     Map<String,Object> meeting;
-
     try {
-      // 2) room이 주어지면: 기존 회의 검색(있으면 그 회의로 진행)
       if (!isBlank(req.room())) {
+        // (A) 주어진 room(invite_code)로 조회
         meeting = meetingService.getByInviteCode(req.room());
         if (meeting == null || meeting.isEmpty()) {
-          // 없으면 새로 생성(여기서 invite_code는 서비스 내부 랜덤 생성)
-          meeting = meetingService.createNew(hostId, title, defaultLang, scheduledAt);
+          // 없고 hostId도 없으면 404
+          if (req.hostId() == null || req.hostId() <= 0) {
+            return ResponseEntity.status(404).body(Map.of(
+                "error", "room_not_found",
+                "message", "invite_code (room) not found"
+            ));
+          }
+          // hostId가 있으면 새로 생성
+          meeting = meetingService.createNew(
+              req.hostId(),
+              isBlank(req.title()) ? "New Meeting" : trim(req.title(), 200),
+              isBlank(req.defaultLang()) ? "ko" : trim(req.defaultLang(), 10),
+              LocalDateTime.now()
+          );
         }
       } else {
-        // 2’) room이 없으면 무조건 새로 생성(랜덤 invite_code)
-        meeting = meetingService.createNew(hostId, title, defaultLang, scheduledAt);
+        // (B) room이 없으면 새 회의 생성(호스트만)
+        if (req.hostId() == null || req.hostId() <= 0) {
+          return ResponseEntity.badRequest().body(Map.of(
+              "error", "invalid_args",
+              "message", "hostId is required when room is not provided"
+          ));
+        }
+        meeting = meetingService.createNew(
+            req.hostId(),
+            isBlank(req.title()) ? "New Meeting" : trim(req.title(), 200),
+            isBlank(req.defaultLang()) ? "ko" : trim(req.defaultLang(), 10),
+            LocalDateTime.now()
+        );
       }
     } catch (Exception e) {
       var pd = ProblemDetail.forStatus(500);
@@ -120,11 +143,23 @@ public class LivekitController {
       ));
     }
 
-    // 3) 최종 room = meeting.invite_code (백엔드 생성 or 기존 것)
-    final String finalRoom = String.valueOf(meeting.get("invite_code"));
+    // 3) 최종 room = meeting.invite_code
+    String finalRoom = String.valueOf(meeting.get("invite_code"));
 
-    // 4) LiveKit 토큰 발급(방 이름 = 최종 invite_code)
-    String jwt = service.createJoinToken(finalRoom, identity, name, ttl);
+    // 4) LiveKit 토큰 발급
+    String jwt = service.createJoinToken(finalRoom, identity, displayName, ttl);
+
+    // 5) 참가자 JOIN 기록(선택) — ParticipantService가 존재하고 userId가 있으면 기록
+  if (participantService != null) {
+    Long uid = req.userId();
+    if (uid != null && uid > 0) {
+      long meetingsId = ((Number) meeting.get("meetings_id")).longValue();
+      long hostId = meeting.get("host_id") == null ? -1L : ((Number) meeting.get("host_id")).longValue();
+      String role = (uid == hostId) ? "HOST" : "GUEST";
+      participantService.joined(meetingsId, uid, role); // joined_at 기록
+    }
+  }
+
 
     return ResponseEntity.ok(new TokenRes(
         cfg.getWsUrl(), jwt, finalRoom, identity, ttl, meeting
@@ -139,7 +174,6 @@ public class LivekitController {
           "message", "LiveKit config is missing"
       ));
     }
-    // room이 없으면 STT 봇도 새 방이 아닌, 별도 정책이 필요함.
     if (isBlank(req.room())) {
       return ResponseEntity.badRequest().body(Map.of(
           "error", "invalid_args",
@@ -153,7 +187,7 @@ public class LivekitController {
       ));
     }
 
-    final String room = req.room();
+    String room = req.room();
     String identity = ("stt-bot-" + room);
     if (identity.length() > 64) identity = identity.substring(0, 64);
 
