@@ -49,4 +49,22 @@ public class TodoCommandService {
         }
         return mapper.updateStatus(userId, taskId, status);
     }
+    @Transactional
+    public int updatePartial(
+            long userId, long taskId,
+            String title,
+            String description,
+            String status,
+            LocalTime dueTime,
+            LocalDate dueDate,
+            String colorCode,
+            Integer displayOrder,
+            Long meetingId
+    ) {
+        return mapper.updatePartial(
+            userId, taskId,
+            title, description, status,
+            dueTime, dueDate, colorCode, displayOrder, meetingId
+        );
+    }
 }

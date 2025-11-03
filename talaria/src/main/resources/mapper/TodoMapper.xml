@@ -79,5 +79,31 @@
     WHERE task_id = #{taskId}
       AND user_id = #{userId}
   </update>
+  <!-- ===== 부분 수정 ===== -->
+  <update id="updatePartial">
+    UPDATE tl_todo_tasks
+    <set>
+      <if test="title != null">         title = #{title},</if>
+      <if test="description != null">   description = #{description},</if>
+      <if test="dueTime != null">       due_time = #{dueTime},</if>
+      <if test="dueDate != null">       due_date = #{dueDate},</if>
+      <if test="colorCode != null">     color_code = #{colorCode},</if>
+      <if test="displayOrder != null">  display_order = #{displayOrder},</if>
+      <if test="meetingId != null">     meeting_id = #{meetingId},</if>
+
+      <!-- status가 넘어온 경우에만 status/ completed_at 동시 갱신 -->
+      <if test="status != null">
+        status = #{status},
+        completed_at = CASE
+                        WHEN #{status} = 'completed'
+                          THEN FLOOR(UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000)
+                        ELSE NULL
+                      END,
+      </if>
+    </set>
+    WHERE task_id = #{taskId}
+      AND user_id = #{userId}
+  </update>
+
 
 </mapper>

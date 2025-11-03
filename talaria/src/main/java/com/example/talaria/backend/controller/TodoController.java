@@ -198,4 +198,64 @@ public class TodoController {
         @Schema(description = "관련 회의 ID(옵션)", example = "21")
         private Long meetingId;
     }
+    @Operation(
+        summary = "Todo 부분 수정",
+        description = "보낸 필드만 수정합니다(제목/설명/마감일/시간/색상/정렬/회의ID/상태). " +
+                    "status가 포함되면 completed_at도 함께 관리합니다."
+    )
+    @PatchMapping("/{taskId}")
+    public ResponseEntity<Map<String, Object>> updatePartial(
+            @Parameter(name = "userId", description = "사용자 ID", in = ParameterIn.PATH, required = true,
+                    schema = @Schema(type = "integer", format = "int64"), example = "1")
+            @PathVariable long userId,
+            @Parameter(name = "taskId", description = "할 일 ID", in = ParameterIn.PATH, required = true,
+                    schema = @Schema(type = "integer", format = "int64"), example = "101")
+            @PathVariable long taskId,
+            @Valid @RequestBody UpdateTodoReq body
+    ) {
+        int n = commandService.updatePartial(
+            userId, taskId,
+            body.getTitle(),
+            body.getDescription(),
+            body.getStatus(),      // null이면 상태 변경 없음, 제공 시 completed_at 자동 처리
+            body.getDueTime(),
+            body.getDueDate(),
+            body.getColorCode(),
+            body.getDisplayOrder(),
+            body.getMeetingId()
+        );
+        var row = queryService.getOneByUser(userId, taskId);
+        return ResponseEntity.ok(Map.of("updated", n, "task", row));
+    }
+    @Data
+    public static class UpdateTodoReq {
+        @Size(max = 128)
+        @Schema(description = "할 일 제목", example = "회의자료 최종 정리")
+        private String title;
+
+        @Schema(description = "상세 설명", example = "회의 메모를 Notion에 정리(최종)")
+        private String description;
+
+        @Pattern(regexp = "^(pending|completed)$", message = "status는 pending|completed 만 허용")
+        @Schema(description = "상태값", allowableValues = {"pending","completed"}, example = "completed")
+        private String status;
+
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+        @Schema(description = "마감일", type = "string", format = "date", example = "2025-11-20")
+        private LocalDate dueDate;
+
+        @DateTimeFormat(pattern = "HH:mm:ss")
+        @Schema(description = "예정 시간(HH:mm:ss)", type = "string", example = "15:30:00")
+        private LocalTime dueTime;
+
+        @Pattern(regexp = "^#[0-9A-Fa-f]{6}$", message = "색상은 #RRGGBB 형식")
+        @Schema(description = "UI 색상(#RRGGBB)", example = "#228BE6")
+        private String colorCode;
+
+        @Schema(description = "정렬 순서(작을수록 위)", example = "5")
+        private Integer displayOrder;
+
+        @Schema(description = "관련 회의 ID(옵션)", example = "21")
+        private Long meetingId;
+    }
 }

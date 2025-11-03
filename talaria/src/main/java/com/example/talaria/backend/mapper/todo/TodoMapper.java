@@ -47,4 +47,15 @@ public interface TodoMapper {
     int updateStatus(@Param("userId") long userId,
                      @Param("taskId") long taskId,
                      @Param("status") String status);
+    // ===== 부분 수정 =====
+    int updatePartial(@Param("userId") long userId,
+                  @Param("taskId") long taskId,
+                  @Param("title") String title,
+                  @Param("description") String description,
+                  @Param("status") String status,
+                  @Param("dueTime") LocalTime dueTime,
+                  @Param("dueDate") LocalDate dueDate,
+                  @Param("colorCode") String colorCode,
+                  @Param("displayOrder") Integer displayOrder,
+                  @Param("meetingId") Long meetingId);
 }
