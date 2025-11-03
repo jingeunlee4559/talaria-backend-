@@ -43,4 +43,8 @@ public interface TodoMapper {
     // ===== 삭제 =====
     int deleteByUser(@Param("userId") long userId,
                      @Param("taskId") long taskId);
+    // ===== 상태 변경 =====
+    int updateStatus(@Param("userId") long userId,
+                     @Param("taskId") long taskId,
+                     @Param("status") String status);
 }

@@ -148,7 +148,22 @@ public class TodoController {
         int n = commandService.delete(userId, taskId);
         return ResponseEntity.ok(Map.of("deleted", n));
     }
-
+    @Operation(summary = "할 일 상태 변경", description = "pending 또는 completed 로 상태를 변경합니다.")
+    @PatchMapping("/{taskId}/status")
+    public ResponseEntity<Map<String, Object>> changeStatus(
+            @PathVariable long userId,
+            @PathVariable long taskId,
+            @RequestBody StatusPatchReq req) {
+        int updated = commandService.updateStatus(userId, taskId, req.getStatus());
+        return ResponseEntity.ok(Map.of("updated", updated));
+    }
+    @Data
+    public static class StatusPatchReq {
+        @NotBlank
+        @Pattern(regexp = "^(pending|completed)$", message = "status는 pending|completed 만 허용")
+        @Schema(description = "변경할 상태", allowableValues = {"pending","completed"}, example = "completed")
+        private String status;
+    }
     // ====== DTO ======
     @Data
     public static class CreateTodoReq {

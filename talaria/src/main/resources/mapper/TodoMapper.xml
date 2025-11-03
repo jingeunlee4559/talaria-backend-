@@ -68,4 +68,16 @@
       AND user_id = #{userId}
   </delete>
 
+  <!-- ===== 상태 변경 ===== -->
+  <update id="updateStatus">
+    UPDATE tl_todo_tasks
+    SET status = #{status},
+        completed_at = CASE
+          WHEN #{status} = 'completed' THEN FLOOR(UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000)
+          ELSE NULL
+        END
+    WHERE task_id = #{taskId}
+      AND user_id = #{userId}
+  </update>
+
 </mapper>

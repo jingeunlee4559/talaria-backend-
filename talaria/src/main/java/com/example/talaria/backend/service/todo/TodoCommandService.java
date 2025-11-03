@@ -42,4 +42,11 @@ public class TodoCommandService {
     public int delete(long userId, long taskId) {
         return mapper.deleteByUser(userId, taskId);
     }
+
+    public int updateStatus(long userId, long taskId, String status) {
+        if (!"pending".equals(status) && !"completed".equals(status)) {
+            throw new IllegalArgumentException("status must be 'pending' or 'completed'");
+        }
+        return mapper.updateStatus(userId, taskId, status);
+    }
 }
