@@ -24,4 +24,10 @@ public interface TodoMapper {
 
     Map<String, Object> selectOneByUser(@Param("userId") long userId,
                                         @Param("taskId") long taskId);
+
+    int deleteOne(@Param("taskId") long taskId, @Param("userId") long userId);
+
+    int updateStatus(@Param("taskId") long taskId,
+                     @Param("userId") long userId,
+                     @Param("status") String status); // 'pending' | 'completed'
 }
