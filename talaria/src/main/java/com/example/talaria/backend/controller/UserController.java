@@ -15,6 +15,10 @@ import jakarta.servlet.http.HttpSession;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -89,6 +93,15 @@ public class UserController {
         return ResponseEntity.ok(UserInfoRes.from(u));
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<?> searchUsersByKeyword(@RequestParam("keyword") String keyword) {
+        List<User> users = userService.searchByKeyword(keyword);
+        List<UserInfoRes> responseData = users.stream()
+                                              .map(UserInfoRes::from)
+                                              .collect(Collectors.toList());
+        return ResponseEntity.ok(responseData);
+    }
+
     // === 응답 DTO(비밀번호 제외) ===
     @Data
     public static class UserInfoRes {
@@ -105,16 +118,30 @@ public class UserController {
         @Schema(description = "프로필 이미지 URL", example = "https://.../avatar.png")
         private String profileImageUrl;
 
-        public static UserInfoRes from(User u) {
-            UserInfoRes r = new UserInfoRes();
-            r.setUserId(u.getUserId());
-            r.setEmail(u.getEmail());
-            r.setName(u.getName());
-            r.setLocale(u.getLocale());
-            r.setRole(u.getRole() == null ? null : String.valueOf(u.getRole()));
-            r.setProfileImageUrl(u.getProfileImageUrl());
-            return r;
+ public static UserInfoRes from(User u) {
+        if (u == null) { // 만약을 위한 방어 코드
+            return null;
         }
+
+        UserInfoRes r = new UserInfoRes();
+        r.setUserId(u.getUserId());
+        r.setEmail(u.getEmail());
+        r.setName(u.getName());
+        r.setLocale(u.getLocale());
+        
+        // ✅ 이 부분이 NullPointerException을 막아주는 핵심입니다!
+        // User의 role 필드가 Enum 타입이라고 가정
+        if (u.getRole() != null) {
+            // .name()은 Enum의 이름을 String으로 안전하게 가져옵니다.
+            r.setRole(u.getRole().name()); 
+        } else {
+            // role 필드가 null이면, DTO의 role도 null로 설정합니다.
+            r.setRole(null); 
+        }
+
+        r.setProfileImageUrl(u.getProfileImageUrl());
+        return r;
+    }
 
     }
 }

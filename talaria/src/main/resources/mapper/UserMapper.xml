@@ -20,4 +20,21 @@
     LIMIT 1
   </select>
 
+  <select id="searchByKeyword" resultType="com.example.talaria.backend.model.User" parameterType="string">
+        SELECT 
+                 user_id            AS userId,
+      email              AS email,
+      password_hash      AS passwordHash,
+      name               AS name,
+      locale             AS locale,
+      role               AS role,
+      created_at         AS createdAt,
+      updated_at         AS updatedAt,
+      profile_image_url  AS profileImageUrl
+        FROM 
+            tl_users
+        WHERE 
+            email LIKE CONCAT('%', #{keyword}, '%')
+    </select>
+
 </mapper>
