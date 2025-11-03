@@ -18,7 +18,9 @@
   </select>
 
   <select id="selectPageByUser" resultType="map">
-    SELECT task_id, user_id, title, status, due_date, created_at
+    SELECT task_id, user_id, title, description, status,
+           due_time, due_date, color_code, display_order,
+           created_at, completed_at, meeting_id
     FROM tl_todo_tasks
     WHERE user_id = #{userId}
     <if test="status != null and status != ''">
@@ -35,22 +37,35 @@
   </select>
 
   <select id="selectOneByUser" resultType="map">
-    SELECT task_id, user_id, title, status, due_date, created_at
+    SELECT task_id, user_id, title, description, status,
+           due_time, due_date, color_code, display_order,
+           created_at, completed_at, meeting_id
     FROM tl_todo_tasks
     WHERE task_id = #{taskId}
       AND user_id = #{userId}
   </select>
 
-  <delete id="deleteOne">
+  <!-- ===== 생성 ===== -->
+  <insert id="insert">
+    INSERT INTO tl_todo_tasks
+      (user_id, title, description, status,
+       due_time, due_date, color_code, display_order,
+       completed_at, meeting_id)
+    VALUES
+      (#{userId}, #{title}, #{description}, #{status},
+       #{dueTime}, #{dueDate}, #{colorCode}, #{displayOrder},
+       #{completedAt}, #{meetingId})
+  </insert>
+
+  <select id="lastInsertId" resultType="long">
+    SELECT LAST_INSERT_ID()
+  </select>
+
+  <!-- ===== 삭제 ===== -->
+  <delete id="deleteByUser">
     DELETE FROM tl_todo_tasks
     WHERE task_id = #{taskId}
       AND user_id = #{userId}
   </delete>
-  <update id="updateStatus">
-    UPDATE tl_todo_tasks
-    SET status = #{status}
-    WHERE task_id = #{taskId}
-      AND user_id = #{userId}
-  </update>
 
 </mapper>

@@ -1,3 +1,4 @@
+// src/main/java/com/example/talaria/backend/service/todo/TodoCommandService.java
 package com.example.talaria.backend.service.todo;
 
 import com.example.talaria.backend.mapper.todo.TodoMapper;
@@ -5,21 +6,40 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 public class TodoCommandService {
-
     private final TodoMapper mapper;
 
     @Transactional
-    public int delete(long userId, long taskId) {
-        return mapper.deleteOne(taskId, userId);
+    public Map<String, Object> create(long userId,
+                                      String title,
+                                      String description,
+                                      String status,            // null -> pending
+                                      LocalTime dueTime,
+                                      LocalDate dueDate,
+                                      String colorCode,
+                                      Integer displayOrder,
+                                      Long meetingId) {
+
+        String st = (status == null || status.isBlank()) ? "pending" : status;
+        Long completedAt = "completed".equals(st) ? System.currentTimeMillis() : null;
+
+        mapper.insert(
+            userId, title, description, st,
+            dueTime, dueDate, colorCode, displayOrder,
+            completedAt, meetingId
+        );
+        long id = mapper.lastInsertId();
+        return mapper.selectOneByUser(userId, id);
     }
 
     @Transactional
-    public int changeStatus(long userId, long taskId, String status) {
-        // 허용값 정규화
-        String s = ("completed".equalsIgnoreCase(status)) ? "completed" : "pending";
-        return mapper.updateStatus(taskId, userId, s);
-    }    
+    public int delete(long userId, long taskId) {
+        return mapper.deleteByUser(userId, taskId);
+    }
 }
