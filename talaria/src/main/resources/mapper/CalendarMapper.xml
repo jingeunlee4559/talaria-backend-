@@ -2,38 +2,81 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.talaria.backend.mapper.calendar.CalendarMapper">
 
-  <select id="countByUser" resultType="long">
-    SELECT COUNT(*)
-    FROM ${table}
-    WHERE user_id = #{userId}
-    <if test="eventId != null">
-      AND ${pk} = #{eventId}
-    </if>
-    <if test="from != null">
-      AND TIMESTAMP(start_date, start_time) &gt;= #{from}
-    </if>
-    <if test="to != null">
-      AND TIMESTAMP(end_date, end_time) &lt;= #{to}
-    </if>
-  </select>
+    <!-- 카운트 조회 -->
+    <select id="countByUser" resultType="long">
+        SELECT COUNT(*)
+        FROM ${table}
+        WHERE user_id = #{userId}
+        <if test="eventId != null">
+            AND ${pk} = #{eventId}
+        </if>
+        <if test="from != null">
+            AND TIMESTAMP(start_date, start_time) &gt;= #{from}
+        </if>
+        <if test="to != null">
+            AND TIMESTAMP(end_date, end_time) &lt;= #{to}
+        </if>
+    </select>
 
-  <select id="selectPageByUser" resultType="map">
-    SELECT event_id, user_id, title, type,
-           start_date, start_time, end_date, end_time,
-           location, description, created_at, updated_at, meeting_id
-    FROM ${table}
-    WHERE user_id = #{userId}
-    <if test="eventId != null">
-      AND ${pk} = #{eventId}
-    </if>
-    <if test="from != null">
-      AND TIMESTAMP(start_date, start_time) &gt;= #{from}
-    </if>
-    <if test="to != null">
-      AND TIMESTAMP(end_date, end_time) &lt;= #{to}
-    </if>
-    ORDER BY start_date DESC, start_time DESC
-    LIMIT #{limit} OFFSET #{offset}
-  </select>
+    <!-- 페이지 조회 -->
+    <select id="selectPageByUser" resultType="map">
+        SELECT event_id, user_id, title, type,
+               start_date, start_time, end_date, end_time,
+               location, description, created_at, updated_at, meeting_id
+        FROM ${table}
+        WHERE user_id = #{userId}
+        <if test="eventId != null">
+            AND ${pk} = #{eventId}
+        </if>
+        <if test="from != null">
+            AND TIMESTAMP(start_date, start_time) &gt;= #{from}
+        </if>
+        <if test="to != null">
+            AND TIMESTAMP(end_date, end_time) &lt;= #{to}
+        </if>
+        ORDER BY start_date DESC, start_time DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 이벤트 추가 -->
+    <insert id="insertEvent" useGeneratedKeys="true" keyProperty="event.event_id" keyColumn="event_id">
+        INSERT INTO ${table} (
+            user_id,
+            title,
+            type,
+            start_date,
+            end_date,
+            start_time,
+            end_time,
+            location,
+            description,
+            meeting_id,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{event.user_id},
+            #{event.title},
+            #{event.type},
+            #{event.start_date},
+            #{event.end_date},
+            #{event.start_time},
+            #{event.end_time},
+            #{event.location},
+            #{event.description},
+            #{event.meeting_id},
+            NOW(),
+            NOW()
+        )
+    </insert>
+
+    <!-- 단일 이벤트 조회 -->
+    <select id="selectOneById" resultType="map">
+        SELECT event_id, user_id, title, type,
+               start_date, start_time, end_date, end_time,
+               location, description, created_at, updated_at, meeting_id
+        FROM ${table}
+        WHERE ${pk} = #{eventId}
+          AND user_id = #{userId}
+    </select>
 
 </mapper>
