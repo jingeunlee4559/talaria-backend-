@@ -36,4 +36,15 @@ public interface CalendarMapper {
                                      @Param("pk") String pk,
                                      @Param("eventId") long eventId,
                                      @Param("userId") long userId);
+
+    // ✅ 수정
+    int updateEvent(@Param("table") String table,
+                    @Param("pk") String pk,
+                    @Param("event") Map<String, Object> event);
+
+    // ✅ 삭제
+    int deleteEvent(@Param("table") String table,
+                    @Param("pk") String pk,
+                    @Param("userId") long userId,
+                    @Param("eventId") long eventId);
 }

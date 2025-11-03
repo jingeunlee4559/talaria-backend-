@@ -79,4 +79,29 @@
           AND user_id = #{userId}
     </select>
 
+    <!-- ✅ 이벤트 수정 -->
+    <update id="updateEvent">
+        UPDATE ${table}
+        SET
+            title = #{event.title},
+            type = #{event.type},
+            start_date = #{event.start_date},
+            end_date = #{event.end_date},
+            start_time = #{event.start_time},
+            end_time = #{event.end_time},
+            location = #{event.location},
+            description = #{event.description},
+            meeting_id = #{event.meeting_id},
+            updated_at = NOW()
+        WHERE ${pk} = #{event.event_id}
+          AND user_id = #{event.user_id}
+    </update>
+
+    <!-- ✅ 이벤트 삭제 -->
+    <delete id="deleteEvent">
+        DELETE FROM ${table}
+        WHERE ${pk} = #{eventId}
+          AND user_id = #{userId}
+    </delete>
+
 </mapper>

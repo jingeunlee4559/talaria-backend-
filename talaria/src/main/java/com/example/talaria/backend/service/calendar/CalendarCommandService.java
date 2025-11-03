@@ -3,12 +3,14 @@ package com.example.talaria.backend.service.calendar;
 import com.example.talaria.backend.dto.calendar.CalendarEventRequest;
 import com.example.talaria.backend.mapper.calendar.CalendarMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CalendarCommandService {
@@ -17,6 +19,7 @@ public class CalendarCommandService {
     private final CalendarQueryService queryService;
 
     private static final String TABLE = "tl_calender";
+    private static final String PK = "event_id";
 
     /**
      * 새 캘린더 이벤트 생성
@@ -51,6 +54,77 @@ public class CalendarCommandService {
         
         // 생성된 이벤트 조회하여 반환
         return queryService.getEventById(userId, eventId);
+    }
+
+    /**
+     * ✅ 이벤트 수정
+     */
+    @Transactional
+    public Map<String, Object> updateEvent(long userId, long eventId, CalendarEventRequest request) {
+        log.info("Updating event. userId: {}, eventId: {}", userId, eventId);
+        
+        // 유효성 검사
+        validateEventRequest(request);
+
+        // 기존 이벤트 존재 여부 확인
+        Map<String, Object> existingEvent = mapper.selectOneById(TABLE, PK, eventId, userId);
+        if (existingEvent == null || existingEvent.isEmpty()) {
+            log.warn("Event not found for update. userId: {}, eventId: {}", userId, eventId);
+            return null;
+        }
+
+        // 업데이트할 데이터 구성
+        Map<String, Object> eventMap = new HashMap<>();
+        eventMap.put("event_id", eventId);
+        eventMap.put("user_id", userId);
+        eventMap.put("title", request.getTitle());
+        eventMap.put("type", request.getType());
+        eventMap.put("start_date", request.getStartDate());
+        eventMap.put("end_date", request.getEndDate());
+        eventMap.put("start_time", request.getStartTime());
+        eventMap.put("end_time", request.getEndTime());
+        eventMap.put("location", request.getLocation());
+        eventMap.put("description", request.getDescription());
+        eventMap.put("meeting_id", request.getMeetingId());
+
+        // DB 업데이트
+        int updated = mapper.updateEvent(TABLE, PK, eventMap);
+        
+        if (updated == 0) {
+            log.warn("No rows updated. userId: {}, eventId: {}", userId, eventId);
+            return null;
+        }
+
+        log.info("Event updated successfully. userId: {}, eventId: {}", userId, eventId);
+
+        // 업데이트된 이벤트 조회하여 반환
+        return queryService.getEventById(userId, eventId);
+    }
+
+    /**
+     * ✅ 이벤트 삭제
+     */
+    @Transactional
+    public boolean deleteEvent(long userId, long eventId) {
+        log.info("Deleting event. userId: {}, eventId: {}", userId, eventId);
+        
+        // 기존 이벤트 존재 여부 확인
+        Map<String, Object> existingEvent = mapper.selectOneById(TABLE, PK, eventId, userId);
+        if (existingEvent == null || existingEvent.isEmpty()) {
+            log.warn("Event not found for deletion. userId: {}, eventId: {}", userId, eventId);
+            return false;
+        }
+
+        // DB 삭제
+        int deleted = mapper.deleteEvent(TABLE, PK, userId, eventId);
+        
+        if (deleted == 0) {
+            log.warn("No rows deleted. userId: {}, eventId: {}", userId, eventId);
+            return false;
+        }
+
+        log.info("Event deleted successfully. userId: {}, eventId: {}", userId, eventId);
+        return true;
     }
 
     /**
