@@ -4,7 +4,7 @@
   "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.talaria.backend.mapper.meeting.MeetingMapper">
 
-  <!-- 목록/카운트 -->
+  <!-- 카운트 -->
   <select id="countByHost" resultType="long">
     SELECT COUNT(*)
     FROM ${table}
@@ -20,6 +20,7 @@
     </if>
   </select>
 
+  <!-- 목록 -->
   <select id="selectPageByHost" resultType="map">
     SELECT meetings_id, host_id, title, status, invite_code,
            default_lang, scheduled_at, created_at, updated_at, ended_at
@@ -38,7 +39,7 @@
     LIMIT #{limit} OFFSET #{offset}
   </select>
 
-  <!-- 단건 조회 (PK=meetings_id) -->
+  <!-- 단건(PK=meetings_id) -->
   <select id="selectOneByHost" resultType="map">
     SELECT meetings_id, host_id, title, status, invite_code,
            default_lang, scheduled_at, created_at, updated_at, ended_at
@@ -53,9 +54,23 @@
            default_lang, scheduled_at, created_at, updated_at, ended_at
     FROM ${table}
     WHERE invite_code = #{inviteCode}
+    LIMIT 1
   </select>
 
-  <!-- 생성 (scheduled_at NOT NULL 값 필수) -->
+  <!-- 최근 활성(상태 유지 + 업데이트 최근) -->
+  <select id="selectRecentActiveByHostAndTitle" resultType="map">
+    SELECT meetings_id, host_id, title, status, invite_code,
+           default_lang, scheduled_at, created_at, updated_at, ended_at
+    FROM ${table}
+    WHERE host_id = #{hostId}
+      AND title = #{title}
+      AND status IN ('SCHEDULED','ONGOING')
+      AND (updated_at &gt;= #{since} OR scheduled_at &gt;= #{since})
+    ORDER BY updated_at DESC, meetings_id DESC
+    LIMIT 1
+  </select>
+
+  <!-- 생성 (scheduled_at NOT NULL 주의) -->
   <insert id="insert">
     INSERT INTO ${table}
       (host_id, title, status, invite_code, default_lang, scheduled_at)
@@ -98,17 +113,5 @@
     SET invite_code = #{inviteCode}
     WHERE ${pk} = #{id} AND host_id = #{hostId}
   </update>
-
-  <select id="selectRecentActiveByHostAndTitle" resultType="map">
-    SELECT meetings_id, host_id, title, status, invite_code,
-           default_lang, scheduled_at, created_at, updated_at, ended_at
-    FROM ${table}
-    WHERE host_id = #{hostId}
-      AND title = #{title}
-      AND status IN ('SCHEDULED','ONGOING')
-      AND created_at &gt;= #{since}
-    ORDER BY created_at DESC
-    LIMIT 1
-  </select>
 
 </mapper>

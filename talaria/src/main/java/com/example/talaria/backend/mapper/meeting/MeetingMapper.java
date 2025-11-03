@@ -32,6 +32,11 @@ public interface MeetingMapper {
     Map<String,Object> selectByInviteCode(@Param("table") String table,
                                           @Param("inviteCode") String inviteCode);
 
+    Map<String,Object> selectRecentActiveByHostAndTitle(@Param("table") String table,
+                                                        @Param("hostId") long hostId,
+                                                        @Param("title") String title,
+                                                        @Param("since") LocalDateTime since);
+
     int insert(@Param("table") String table,
                @Param("hostId") long hostId,
                @Param("title") String title,
@@ -69,9 +74,4 @@ public interface MeetingMapper {
                       @Param("id") long id,
                       @Param("hostId") long hostId,
                       @Param("inviteCode") String inviteCode);
-
-    Map<String,Object> selectRecentActiveByHostAndTitle(@Param("table") String table,
-                                                        @Param("hostId") long hostId,
-                                                        @Param("title") String title,
-                                                        @Param("since") LocalDateTime since);
 }
