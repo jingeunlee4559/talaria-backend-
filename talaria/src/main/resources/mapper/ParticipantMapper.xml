@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.talaria.backend.mapper.meeting.ParticipantMapper">
+
+  <!-- 회의별 카운트 -->
+  <select id="countByMeeting" resultType="long">
+    SELECT COUNT(*)
+    FROM tl_meeting_participants
+    WHERE meetings_id = #{meetingsId}
+  </select>
+
+  <!-- 회의별 목록 -->
+  <select id="selectByMeeting" resultType="map">
+    SELECT
+      meeting_participants_id,
+      meetings_id,
+      user_id,
+      role,
+      joined_at,
+      left_at
+    FROM tl_meeting_participants
+    WHERE meetings_id = #{meetingsId}
+    ORDER BY meeting_participants_id DESC
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- 단건 -->
+  <select id="selectOne" resultType="map">
+    SELECT
+      meeting_participants_id,
+      meetings_id,
+      user_id,
+      role,
+      joined_at,
+      left_at
+    FROM tl_meeting_participants
+    WHERE meetings_id = #{meetingsId}
+      AND user_id = #{userId}
+  </select>
+
+  <!-- 역할 UPSERT (초대 개념) -->
+  <insert id="upsertRole">
+    INSERT INTO tl_meeting_participants (meetings_id, user_id, role)
+    VALUES (#{meetingsId}, #{userId}, #{role})
+    ON DUPLICATE KEY UPDATE
+      role = VALUES(role)
+  </insert>
+
+  <!-- JOIN: 입장 시각 갱신, 퇴장 상태 해제 -->
+  <update id="markJoined">
+    UPDATE tl_meeting_participants
+    SET joined_at = NOW(),
+        left_at   = NULL
+    WHERE meetings_id = #{meetingsId}
+      AND user_id     = #{userId}
+  </update>
+
+  <!-- LEAVE: 퇴장 시각 기록 -->
+  <update id="markLeft">
+    UPDATE tl_meeting_participants
+    SET left_at = NOW()
+    WHERE meetings_id = #{meetingsId}
+      AND user_id     = #{userId}
+  </update>
+
+  <!-- 삭제(옵션) -->
+  <delete id="deleteOne">
+    DELETE FROM tl_meeting_participants
+    WHERE meetings_id = #{meetingsId}
+      AND user_id     = #{userId}
+  </delete>
+
+</mapper>

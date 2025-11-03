@@ -16,6 +16,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
 
 @RestController
 @RequestMapping("/api/users")
@@ -44,27 +47,27 @@ public class UserController {
         this.userService = userService;
     }
 
-@PostMapping("/login")
-public ResponseEntity<?> login(@RequestBody LoginRequestDto loginRequestDto) {
-    // 1️⃣ 이메일로 사용자 조회
-    User loggedInUser = userService.login(loginRequestDto.getEmail());
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequestDto loginRequestDto) {
+        // 1️⃣ 이메일로 사용자 조회
+        User loggedInUser = userService.login(loginRequestDto.getEmail());
 
-    // 2️⃣ 사용자 존재 확인
-    if (loggedInUser == null) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body("Login Failed: User not found");
+        // 2️⃣ 사용자 존재 확인
+        if (loggedInUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("Login Failed: User not found");
+        }
+
+        // 3️⃣ 비밀번호 비교 (해시 사용하지 않는 단순 비교)
+        if (!loginRequestDto.getPassword().equals(loggedInUser.getPasswordHash())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("Login Failed: Incorrect password");
+        }
+
+        // 4️⃣ 로그인 성공 → 사용자 정보 반환
+        // ※ 세션 생성 X
+        return ResponseEntity.ok(loggedInUser);
     }
-
-    // 3️⃣ 비밀번호 비교 (해시 사용하지 않는 단순 비교)
-    if (!loginRequestDto.getPassword().equals(loggedInUser.getPasswordHash())) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body("Login Failed: Incorrect password");
-    }
-
-    // 4️⃣ 로그인 성공 → 사용자 정보 반환
-    // ※ 세션 생성 X
-    return ResponseEntity.ok(loggedInUser);
-}
 
     @PostMapping("/logout")
     public ResponseEntity<String> logout(HttpServletRequest request) {
@@ -74,4 +77,11 @@ public ResponseEntity<?> login(@RequestBody LoginRequestDto loginRequestDto) {
         }
         return ResponseEntity.ok("Logout Successful");
     }
+
+    @GetMapping("/search")
+    public String getMethodName(@RequestParam String param) {
+        
+        return new String();
+    }
+    
 }
