@@ -21,5 +21,5 @@ public class TodoCommandService {
         // 허용값 정규화
         String s = ("completed".equalsIgnoreCase(status)) ? "completed" : "pending";
         return mapper.updateStatus(taskId, userId, s);
-    }
+    }    
 }
