@@ -30,6 +30,12 @@ public class ParticipantController {
         return ResponseEntity.ok(service.list(meetingsId, page, size));
     }
 
+    @GetMapping("/count")
+    public ResponseEntity<Map<String, Object>> getCount(@PathVariable long meetingsId) {
+        long count = service.getTotalCount(meetingsId);
+        return ResponseEntity.ok(Map.of("totalCount", count));
+    }
+
     // 단건
     @GetMapping("/{userId}")
     public ResponseEntity<Map<String,Object>> getOne(@PathVariable long meetingsId,

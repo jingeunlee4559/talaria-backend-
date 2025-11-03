@@ -11,6 +11,17 @@
     WHERE meetings_id = #{meetingsId}
   </select>
 
+  <select id="countByMeetingIncludingHost" resultType="long">
+    SELECT COUNT(DISTINCT p.user_id) + 
+           CASE WHEN m.host_id NOT IN (SELECT user_id FROM tl_meeting_participants WHERE meetings_id = #{meetingsId}) 
+                THEN 1 
+                ELSE 0 
+           END as total_count
+    FROM tl_meetings m
+    LEFT JOIN tl_meeting_participants p ON m.meetings_id = p.meetings_id
+    WHERE m.meetings_id = #{meetingsId}
+  </select>
+
   <!-- 회의별 목록 -->
   <select id="selectByMeeting" resultType="map">
     SELECT

@@ -67,4 +67,8 @@ public class ParticipantService {
             default -> "GUEST";
         };
     }
+
+  public long getTotalCount(long meetingsId) {
+    return mapper.countByMeetingIncludingHost(meetingsId);
+}
 }

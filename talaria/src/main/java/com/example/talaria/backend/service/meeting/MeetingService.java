@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -110,4 +111,32 @@ public class MeetingService {
         for (int i = 0; i < len; i++) out[i] = ALPHANUM[RND.nextInt(ALPHANUM.length)];
         return new String(out);
     }
+
+ // 사용자가 호스트이거나 참가자인 모든 회의 조회 (참가자 정보 포함)
+    public PageResponse listByUserIncludingParticipant(
+        long userId, String status, LocalDateTime from, LocalDateTime to,
+        int page, int size) {
+        
+        if (size > 100) size = 100;
+        int offset = page * size;
+        
+        long total = mapper.countByUserIncludingParticipant(userId, status, from, to);
+        List<Map<String,Object>> items = mapper.selectByUserIncludingParticipant(
+            userId, status, from, to, size, offset
+        );
+        
+        // 각 회의에 대해 참가자 정보 추가
+        for (Map<String, Object> meeting : items) {
+            Long meetingId = (Long) meeting.get("meetings_id");
+            if (meetingId != null) {
+                List<Map<String, Object>> participants = mapper.selectParticipantsByMeetingId(meetingId);
+                meeting.put("participants_data", participants);
+            } else {
+                meeting.put("participants_data", new ArrayList<>());
+            }
+        }
+        
+        return new PageResponse(items, page, size, total);
+    }
+
 }

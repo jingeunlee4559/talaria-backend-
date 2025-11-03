@@ -74,4 +74,26 @@ public interface MeetingMapper {
                       @Param("id") long id,
                       @Param("hostId") long hostId,
                       @Param("inviteCode") String inviteCode);
+
+
+    // 사용자가 호스트이거나 참가자인 모든 회의 조회
+    List<Map<String,Object>> selectByUserIncludingParticipant(
+    @Param("userId") long userId,
+    @Param("status") String status,
+    @Param("from") LocalDateTime from,
+    @Param("to") LocalDateTime to,
+    @Param("limit") int limit,
+    @Param("offset") int offset
+);
+
+long countByUserIncludingParticipant(
+    @Param("userId") long userId,
+    @Param("status") String status,
+    @Param("from") LocalDateTime from,
+    @Param("to") LocalDateTime to
+);
+
+ List<Map<String,Object>> selectParticipantsByMeetingId(@Param("meetingsId") long meetingsId);
+    
+
 }

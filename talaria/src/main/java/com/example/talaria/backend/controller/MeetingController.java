@@ -138,4 +138,20 @@ public class MeetingController {
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
         private LocalDateTime endedAt;
     }
+
+// 내가 호스트이거나 참가자인 모든 회의 조회
+    @GetMapping("/all")
+    public ResponseEntity<PageResponse> listAll(
+        @PathVariable("userId") long userId,
+        @RequestParam(name = "status", required = false) String status,
+        @RequestParam(name = "from", required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+        @RequestParam(name = "to", required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+        @RequestParam(name = "page", defaultValue = "0")  int page,
+        @RequestParam(name = "size", defaultValue = "20") int size) {
+    return ResponseEntity.ok(
+        service.listByUserIncludingParticipant(userId, status, from, to, page, size)
+    );
+}
 }

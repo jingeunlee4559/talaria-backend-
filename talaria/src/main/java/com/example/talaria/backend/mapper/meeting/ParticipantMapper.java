@@ -16,6 +16,8 @@ public interface ParticipantMapper {
 
     long countByMeeting(@Param("meetingsId") long meetingsId);
 
+      long countByMeetingIncludingHost(long meetingsId);
+
     // 단건 조회
     Map<String,Object> selectOne(@Param("meetingsId") long meetingsId,
                                  @Param("userId") long userId);
