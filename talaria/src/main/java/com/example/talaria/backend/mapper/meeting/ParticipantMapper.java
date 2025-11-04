@@ -15,8 +15,7 @@ public interface ParticipantMapper {
                                              @Param("offset") int offset);
 
     long countByMeeting(@Param("meetingsId") long meetingsId);
-
-      long countByMeetingIncludingHost(long meetingsId);
+    
 
     // 단건 조회
     Map<String,Object> selectOne(@Param("meetingsId") long meetingsId,
@@ -38,4 +37,9 @@ public interface ParticipantMapper {
     // 행 삭제(옵션)
     int deleteOne(@Param("meetingsId") long meetingsId,
                   @Param("userId") long userId);
+
+   List<Map<String,Object>> selectByMeetingWithUserInfo(@Param("meetingsId") long meetingsId);
+
+    long countByMeetingIncludingHost(@Param("meetingsId") long meetingsId);
+    
 }

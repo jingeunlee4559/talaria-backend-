@@ -68,7 +68,12 @@ public class ParticipantService {
         };
     }
 
-  public long getTotalCount(long meetingsId) {
-    return mapper.countByMeetingIncludingHost(meetingsId);
-}
+    // 참가자 목록 + user 정보 조회 (public으로 외부에서 호출 가능)
+    public List<Map<String, Object>> getParticipantsWithUserInfo(long meetingsId) {
+        return mapper.selectByMeetingWithUserInfo(meetingsId);
+    }
+
+    public long getTotalCount(long meetingsId) {
+        return mapper.countByMeetingIncludingHost(meetingsId);
+    }
 }

@@ -11,6 +11,7 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,6 +20,7 @@ import java.util.Map;
 public class MeetingService {
 
     private final MeetingMapper mapper;
+     private final ParticipantService participantService;
 
     private static final String TABLE = "tl_meetings";
     private static final String PK    = "meetings_id";
@@ -113,30 +115,63 @@ public class MeetingService {
     }
 
  // 사용자가 호스트이거나 참가자인 모든 회의 조회 (참가자 정보 포함)
-    public PageResponse listByUserIncludingParticipant(
-        long userId, String status, LocalDateTime from, LocalDateTime to,
-        int page, int size) {
+  public PageResponse listByUserIncludingParticipant(
+    long userId, String status, LocalDateTime from, LocalDateTime to,
+    int page, int size) {
+    
+    if (size > 100) size = 100;
+    int offset = page * size;
+    
+    long total = mapper.countByUserIncludingParticipant(userId, status, from, to);
+    List<Map<String,Object>> items = mapper.selectByUserIncludingParticipant(
+        userId, status, from, to, size, offset
+    );
+    
+    // 각 회의에 대해 참가자 정보 및 호스트 정보 정리
+    for (Map<String, Object> meeting : items) {
+        Long meetingId = toLong(meeting.get("meetings_id"));
         
-        if (size > 100) size = 100;
-        int offset = page * size;
+        // 호스트 정보를 별도 객체로 구조화
+        Map<String, Object> host = new HashMap<>();
+        host.put("user_id", meeting.get("host_id"));
+        host.put("name", meeting.get("host_name"));
+        host.put("email", meeting.get("host_email"));
+        host.put("profile_image_url", meeting.get("host_profile_image_url"));
+        host.put("locale", meeting.get("host_locale"));
         
-        long total = mapper.countByUserIncludingParticipant(userId, status, from, to);
-        List<Map<String,Object>> items = mapper.selectByUserIncludingParticipant(
-            userId, status, from, to, size, offset
-        );
+        meeting.put("host", host);
         
-        // 각 회의에 대해 참가자 정보 추가
-        for (Map<String, Object> meeting : items) {
-            Long meetingId = (Long) meeting.get("meetings_id");
-            if (meetingId != null) {
-                List<Map<String, Object>> participants = mapper.selectParticipantsByMeetingId(meetingId);
-                meeting.put("participants_data", participants);
-            } else {
-                meeting.put("participants_data", new ArrayList<>());
-            }
+        // 원본 host 필드 제거 (선택사항)
+        meeting.remove("host_name");
+        meeting.remove("host_email");
+        meeting.remove("host_profile_image_url");
+        meeting.remove("host_locale");
+        
+        // 참가자 정보 추가
+        if (meetingId != null) {
+            List<Map<String, Object>> participants = 
+                participantService.getParticipantsWithUserInfo(meetingId);
+            meeting.put("participants", participants);
+            meeting.put("participant_count", participants.size());
+        } else {
+            meeting.put("participants", new ArrayList<>());
+            meeting.put("participant_count", 0);
         }
-        
-        return new PageResponse(items, page, size, total);
     }
-
+    
+    return new PageResponse(items, page, size, total);
 }
+
+// BigInteger, Integer 등을 안전하게 Long으로 변환
+private Long toLong(Object obj) {
+    if (obj == null) return null;
+    if (obj instanceof Long) return (Long) obj;
+    if (obj instanceof Integer) return ((Integer) obj).longValue();
+    if (obj instanceof java.math.BigInteger) return ((java.math.BigInteger) obj).longValue();
+    if (obj instanceof Number) return ((Number) obj).longValue();
+    return null;
+}
+}
+
+
+

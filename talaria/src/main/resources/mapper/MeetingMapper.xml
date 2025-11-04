@@ -116,7 +116,8 @@
 
 
 <!-- 목록 조회 시 참가자 정보 포함 -->
-  <select id="selectByUserIncludingParticipant" resultType="map">
+<!-- 목록 조회 시 호스트 정보 포함 -->
+<select id="selectByUserIncludingParticipant" resultType="map">
     SELECT DISTINCT
         m.meetings_id,
         m.host_id,
@@ -130,10 +131,17 @@
         CASE 
             WHEN m.host_id = #{userId} THEN 'HOST'
             ELSE COALESCE(p.role, 'GUEST')
-        END as user_role
+        END as user_role,
+        -- 호스트 정보 추가
+        host.name as host_name,
+        host.email as host_email,
+        host.profile_image_url as host_profile_image_url,
+        host.locale as host_locale
     FROM tl_meetings m
     LEFT JOIN tl_meeting_participants p 
         ON m.meetings_id = p.meetings_id AND p.user_id = #{userId}
+    LEFT JOIN tl_users host 
+        ON m.host_id = host.user_id
     WHERE m.host_id = #{userId}  
        OR p.user_id = #{userId}   
     <if test="status != null and status != ''">
@@ -147,7 +155,7 @@
     </if>
     ORDER BY m.scheduled_at DESC, m.meetings_id DESC
     LIMIT #{limit} OFFSET #{offset}
-  </select>
+</select>
 
 <!-- 카운트 쿼리 -->
 <select id="countByUserIncludingParticipant" resultType="long">
@@ -169,7 +177,7 @@
 </select>
 
   <!-- 특정 회의의 모든 참가자 조회 -->
-  <select id="selectParticipantsByMeetingId" resultType="map">
+  <!-- <select id="selectParticipantsByMeetingId" resultType="map">
     SELECT 
         p.user_id,
         p.role,
@@ -178,7 +186,10 @@
     FROM tl_meeting_participants p
     LEFT JOIN tl_users u ON p.user_id = u.user_id
     WHERE p.meetings_id = #{meetingsId}
-  </select>
+  </select> -->
+
+
+
 
 
 </mapper>

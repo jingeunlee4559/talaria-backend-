@@ -83,4 +83,30 @@
       AND user_id     = #{userId}
   </delete>
 
+
+    <select id="selectByMeetingWithUserInfo" resultType="map">
+    SELECT 
+        p.meeting_participants_id,
+        p.meetings_id,
+        p.user_id,
+        p.role,
+        p.joined_at,
+        p.left_at,
+        u.name as user_name,
+        u.email as user_email,
+        u.profile_image_url as user_profile_image_url,
+        u.locale as user_locale
+    FROM tl_meeting_participants p
+    INNER JOIN tl_users u ON p.user_id = u.user_id
+    WHERE p.meetings_id = #{meetingsId}
+    ORDER BY 
+        CASE p.role 
+            WHEN 'HOST' THEN 1
+            WHEN 'GUEST' THEN 2
+            WHEN 'VIEWER' THEN 3
+        END,
+        p.joined_at ASC
+  </select>
+
+
 </mapper>
