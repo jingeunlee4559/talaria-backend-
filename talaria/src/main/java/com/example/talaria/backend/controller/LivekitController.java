@@ -1,6 +1,7 @@
 package com.example.talaria.backend.controller;
 
 import com.example.talaria.backend.config.LivekitConfig;
+import com.example.talaria.backend.service.LivekitAdminService;
 import com.example.talaria.backend.service.LivekitService;
 import com.example.talaria.backend.service.meeting.MeetingService;
 import com.example.talaria.backend.service.meeting.ParticipantService;
@@ -25,6 +26,7 @@ public class LivekitController {
   private final LivekitService service;
   private final LivekitConfig cfg;
   private final MeetingService meetingService;
+  private final LivekitAdminService adminService;
 
   @Autowired(required = false)
   private ParticipantService participantService; // 선택 주입
@@ -150,16 +152,15 @@ public class LivekitController {
     String jwt = service.createJoinToken(finalRoom, identity, displayName, ttl);
 
     // 5) 참가자 JOIN 기록(선택) — ParticipantService가 존재하고 userId가 있으면 기록
-  if (participantService != null) {
-    Long uid = req.userId();
-    if (uid != null && uid > 0) {
-      long meetingsId = ((Number) meeting.get("meetings_id")).longValue();
-      long hostId = meeting.get("host_id") == null ? -1L : ((Number) meeting.get("host_id")).longValue();
-      String role = (uid == hostId) ? "HOST" : "GUEST";
-      participantService.joined(meetingsId, uid, role); // joined_at 기록
+    if (participantService != null) {
+      Long uid = req.userId();
+      if (uid != null && uid > 0) {
+        long meetingsId = ((Number) meeting.get("meetings_id")).longValue();
+        long hostId = meeting.get("host_id") == null ? -1L : ((Number) meeting.get("host_id")).longValue();
+        String role = (uid == hostId) ? "HOST" : "GUEST";
+        participantService.joined(meetingsId, uid, role); // joined_at 기록
+      }
     }
-  }
-
 
     return ResponseEntity.ok(new TokenRes(
         cfg.getWsUrl(), jwt, finalRoom, identity, ttl, meeting
@@ -202,6 +203,22 @@ public class LivekitController {
         "ttlSec", ttl
     ));
   }
+
+  /**
+   *  meetings_id로 현재 LiveKit 참가자 수 조회
+   * GET /livekit/meetings/{meetingsId}/participants/count
+   */
+  // LivekitController.java (일부)
+  @GetMapping("/meetings/{id}/participants/count")
+  public ResponseEntity<?> count(@PathVariable long id) {
+    var meeting = meetingService.getById(id);      // getById는 앞서 드린 대로 추가
+    if (meeting == null) return ResponseEntity.notFound().build();
+
+    String room = String.valueOf(meeting.get("invite_code"));
+    int count = adminService.countParticipantsByRoom(room);
+    return ResponseEntity.ok(Map.of("room", room, "count", count));
+  }
+
 
   // ===== utils =====
   private static boolean isBlank(String s) { return s == null || s.isBlank(); }

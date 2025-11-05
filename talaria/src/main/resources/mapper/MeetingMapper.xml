@@ -176,6 +176,13 @@
     </if>
 </select>
 
+<select id="selectById" resultType="map">
+  SELECT *
+  FROM ${table}
+  WHERE ${pk} = #{id}
+  LIMIT 1
+</select>
+
   <!-- 특정 회의의 모든 참가자 조회 -->
   <!-- <select id="selectParticipantsByMeetingId" resultType="map">
     SELECT 

@@ -93,7 +93,9 @@ public interface MeetingMapper {
         @Param("to") LocalDateTime to
     );
 
-
+    Map<String, Object> selectById(@Param("table") String table,
+                               @Param("pk") String pk,
+                               @Param("id") long id);
 
 
 
