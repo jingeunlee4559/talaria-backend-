@@ -111,7 +111,7 @@ public class CalendarController {
     }
 
     /**
-     * ✅ 캘린더 이벤트 수정
+     *  캘린더 이벤트 수정
      */
     @PutMapping("/{eventId}")
     public ResponseEntity<?> updateEvent(
@@ -144,7 +144,7 @@ public class CalendarController {
     }
 
     /**
-     * ✅ 캘린더 이벤트 삭제
+     *  캘린더 이벤트 삭제
      */
     @DeleteMapping("/{eventId}")
     public ResponseEntity<?> deleteEvent(
