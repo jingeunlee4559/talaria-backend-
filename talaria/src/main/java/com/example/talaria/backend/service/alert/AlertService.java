@@ -27,7 +27,7 @@ public class AlertService {
     private static final String TABLE = "tl_alerts";
     private static final String PK    = "id";
 
-    // ▼ 요구사항 고정 값
+    
     private static final String TYPE_MEETING  = "MEETING";
     private static final String TITLE_MEETING = "회의 안내";
 
@@ -124,8 +124,7 @@ public class AlertService {
     /* ===================== 내부 유틸 ===================== */
 
     private static String formatBody(String meetingTitle) {
-        // 요구사항: "{회의제목} 회의가 예약되어있습니다."
-        return meetingTitle + " 회의가 예약되어있습니다.";
+        return  meetingTitle + "  회의가 예약되어있습니다.";
     }
 
     private static String payloadJson(long meetingId) {

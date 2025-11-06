@@ -129,13 +129,9 @@ public class UserController {
         r.setName(u.getName());
         r.setLocale(u.getLocale());
         
-        // ✅ 이 부분이 NullPointerException을 막아주는 핵심입니다!
-        // User의 role 필드가 Enum 타입이라고 가정
         if (u.getRole() != null) {
-            // .name()은 Enum의 이름을 String으로 안전하게 가져옵니다.
             r.setRole(u.getRole().name()); 
         } else {
-            // role 필드가 null이면, DTO의 role도 null로 설정합니다.
             r.setRole(null); 
         }
 
