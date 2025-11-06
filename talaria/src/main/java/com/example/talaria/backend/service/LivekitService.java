@@ -34,7 +34,7 @@ public class LivekitService {
     );
     String jwt = at.toJwt();
     System.out.println("[TOKEN] " + at.toJwt().substring(0,50) + "...");
-System.out.println("[LIVEKIT JWT FULL] " + jwt);
+    System.out.println("[LIVEKIT JWT FULL] " + jwt);
     return at.toJwt();
   }
 
