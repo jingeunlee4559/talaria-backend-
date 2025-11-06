@@ -62,4 +62,11 @@ public interface AlertMapper {
     // (선택) 배지용 미열람 카운트
     long countUnreadByUser(@Param("table") String table,
                            @Param("userId") long userId);
+
+    int insertAlert(@Param("table") String table,
+                    @Param("userId") Long userId,
+                    @Param("type") String type,
+                    @Param("title") String title,
+                    @Param("body") String body,
+                    @Param("payload") String payloadJson);
 }

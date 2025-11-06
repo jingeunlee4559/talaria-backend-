@@ -6,6 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
+import com.example.talaria.backend.event.MeetingEvents.MeetingCreatedEvent;
+import com.example.talaria.backend.event.MeetingEvents.MeetingUpdatedEvent;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -21,6 +24,7 @@ public class MeetingService {
 
     private final MeetingMapper mapper;
     private final ParticipantService participantService;
+    private final ApplicationEventPublisher events;
 
     private static final String TABLE = "tl_meetings";
     private static final String PK    = "meetings_id";
@@ -74,7 +78,10 @@ public class MeetingService {
             try {
                 mapper.insert(TABLE, hostId, title, DEFAULT_STATUS, invite, defaultLang, scheduledAt);
                 long id = mapper.lastInsertId();
-                return getOneByHost(hostId, id);
+                Map<String,Object> created = getOneByHost(hostId, id);
+                // ★ AFTER_COMMIT 리스너가 동작하도록 이벤트 발행
+                events.publishEvent(new MeetingCreatedEvent(id));
+                return created;
             } catch (DataIntegrityViolationException dup) {
                 invite = generateInviteCode(10);
             }
@@ -83,19 +90,37 @@ public class MeetingService {
     }
 
     // 부분 수정
+    @Transactional
     public int updatePartial(long hostId, long id, String title, String status,
                              String inviteCode, String defaultLang,
                              LocalDateTime scheduledAt, LocalDateTime endedAt) {
-        return mapper.updatePartial(TABLE, PK, id, hostId, title, status, inviteCode, defaultLang, scheduledAt, endedAt);
+        int updated = mapper.updatePartial(TABLE, PK, id, hostId, title, status, inviteCode, defaultLang, scheduledAt, endedAt);
+        // ★ 회의 시간/제목/상태 변경 시 캘린더 동기화를 위해 이벤트 발행
+        if (updated > 0) {
+            events.publishEvent(new MeetingUpdatedEvent(id));
+        }
+        return updated;
     }
 
     // 시작/종료/재발급
+    @Transactional
     public int start(long hostId, long id) {
-        return mapper.markOngoing(TABLE, PK, id, hostId);
+        int updated = mapper.markOngoing(TABLE, PK, id, hostId);
+        // 상태 변경도 업데이트 이벤트로 통지
+        if (updated > 0) {
+            events.publishEvent(new MeetingUpdatedEvent(id));
+        }
+        return updated;
     }
 
+    @Transactional
     public int end(long hostId, long id) {
-        return mapper.markEnded(TABLE, PK, id, hostId, LocalDateTime.now());
+        int updated = mapper.markEnded(TABLE, PK, id, hostId, LocalDateTime.now());
+        // 종료 시에도 업데이트 이벤트로 통지(필요 시 캘린더 정책 반영)
+        if (updated > 0) {
+            events.publishEvent(new MeetingUpdatedEvent(id));
+        }
+        return updated;
     }
 
     public int regenerateInvite(long hostId, long id) {

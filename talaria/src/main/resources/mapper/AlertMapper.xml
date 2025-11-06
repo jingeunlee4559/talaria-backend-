@@ -88,5 +88,12 @@
     WHERE user_id = #{userId}
       AND status IN ('PENDING','SENT')
   </select>
+  <!-- tl_alerts: user_id, type, title, body, payload(JSON), status=PENDING, created_at NOW -->
+  <insert id="insertAlert">
+    INSERT INTO ${table}
+      (user_id, type, title, body, payload, status, created_at)
+    VALUES
+      (#{userId}, #{type}, #{title}, #{body}, CAST(#{payload} AS JSON), 'PENDING', NOW())
+  </insert>
 
 </mapper>

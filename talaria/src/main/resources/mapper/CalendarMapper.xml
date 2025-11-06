@@ -79,7 +79,7 @@
           AND user_id = #{userId}
     </select>
 
-    <!-- ✅ 이벤트 수정 -->
+    <!--  이벤트 수정 -->
     <update id="updateEvent">
         UPDATE ${table}
         SET
@@ -97,11 +97,35 @@
           AND user_id = #{event.user_id}
     </update>
 
-    <!-- ✅ 이벤트 삭제 -->
+    <!--  이벤트 삭제 -->
     <delete id="deleteEvent">
         DELETE FROM ${table}
         WHERE ${pk} = #{eventId}
           AND user_id = #{userId}
     </delete>
+    <update id="updateAllByMeetingId">
+    UPDATE ${table}
+       SET title       = #{title},
+           start_date  = #{startDate},
+           end_date    = #{endDate},
+           start_time  = #{startTime},
+           end_time    = #{endTime},
+           location    = #{location},
+           description = #{description},
+           updated_at  = NOW()
+     WHERE meeting_id = #{meetingId}
+  </update>
 
+  <!-- 회의 연동 일정 전체 DELETE -->
+  <delete id="deleteByMeetingId">
+    DELETE FROM ${table}
+     WHERE meeting_id = #{meetingId}
+  </delete>
+
+  <!-- 특정 사용자-회의 연동 일정 DELETE -->
+  <delete id="deleteByUserAndMeeting">
+    DELETE FROM ${table}
+     WHERE user_id   = #{userId}
+       AND meeting_id = #{meetingId}
+  </delete>
 </mapper>

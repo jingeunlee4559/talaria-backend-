@@ -57,7 +57,7 @@ public class CalendarCommandService {
     }
 
     /**
-     * ✅ 이벤트 수정
+     * 이벤트 수정
      */
     @Transactional
     public Map<String, Object> updateEvent(long userId, long eventId, CalendarEventRequest request) {
@@ -102,7 +102,7 @@ public class CalendarCommandService {
     }
 
     /**
-     * ✅ 이벤트 삭제
+     *  이벤트 삭제
      */
     @Transactional
     public boolean deleteEvent(long userId, long eventId) {
