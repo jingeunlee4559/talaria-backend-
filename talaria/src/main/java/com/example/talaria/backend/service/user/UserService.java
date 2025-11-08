@@ -2,6 +2,7 @@
 package com.example.talaria.backend.service.user;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,10 @@ public class UserService {
     public User getByEmail(String email){ 
         return userMapper.findByEmail(email); }
 
-public List<User> searchByKeyword(String keyword) {
+    public List<User> searchByKeyword(String keyword) {
         return userMapper.searchByKeyword(keyword);
+    }
+    public Map<String,Object> getById(long id) {
+        return userMapper.findById(id);    // { user_id, email, name, locale, ... }
     }
 }

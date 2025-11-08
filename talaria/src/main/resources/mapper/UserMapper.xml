@@ -21,8 +21,8 @@
   </select>
 
   <select id="searchByKeyword" resultType="com.example.talaria.backend.model.User" parameterType="string">
-        SELECT 
-                 user_id            AS userId,
+    SELECT
+      user_id            AS userId,
       email              AS email,
       password_hash      AS passwordHash,
       name               AS name,
@@ -31,10 +31,39 @@
       created_at         AS createdAt,
       updated_at         AS updatedAt,
       profile_image_url  AS profileImageUrl
-        FROM 
-            tl_users
-        WHERE 
-            email LIKE CONCAT('%', #{keyword}, '%')
-    </select>
+    FROM tl_users
+    WHERE email LIKE CONCAT('%', #{keyword}, '%')
+  </select>
+
+  <select id="findById" parameterType="long" resultType="com.example.talaria.backend.model.User">
+    SELECT
+      user_id            AS userId,
+      email              AS email,
+      password_hash      AS passwordHash,
+      name               AS name,
+      locale             AS locale,
+      role               AS role,
+      created_at         AS createdAt,
+      updated_at         AS UpdatedAt,
+      profile_image_url  AS profileImageUrl
+    FROM tl_users
+    WHERE user_id = #{id}
+    LIMIT 1
+  </select>
+
+  <select id="findLocaleById" parameterType="long" resultType="string">
+    SELECT locale
+    FROM tl_users
+    WHERE user_id = #{id}
+    LIMIT 1
+  </select>
+
+  <update id="updateLocale" parameterType="map">
+    UPDATE tl_users
+    SET
+      locale = #{locale},
+      updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = #{id}
+  </update>
 
 </mapper>
