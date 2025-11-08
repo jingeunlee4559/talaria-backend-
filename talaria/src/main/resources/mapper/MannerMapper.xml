@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.talaria.backend.mapper.manner.MannerMapper">
+
+    <!-- 룰 개수 카운트 -->
+    <select id="countRules" parameterType="map" resultType="long">
+        SELECT COUNT(*) FROM ${table}
+        WHERE 1=1
+        <if test="active != null">
+            AND active = #{active}
+        </if>
+
+        <!-- agent_code IN (...) -->
+        <if test="agentCodes != null and agentCodes.size() > 0">
+            AND agent_code IN
+            <foreach collection="agentCodes" item="ac" open="(" separator="," close=")">
+                #{ac}
+            </foreach>
+        </if>
+
+        <!-- 로케일: rule.speaker_locale 가 제공값의 prefix 인 경우 매칭 (NULL은 와일드카드) -->
+        <if test="speakerLocale != null and speakerLocale != ''">
+            AND (speaker_locale IS NULL OR #{speakerLocale} LIKE CONCAT(speaker_locale, '%'))
+        </if>
+        <if test="listenerLocale != null and listenerLocale != ''">
+            AND (listener_locale IS NULL OR #{listenerLocale} LIKE CONCAT(listener_locale, '%'))
+        </if>
+
+        <!-- 문화/언어쌍: 제공되면 같다 또는 rule NULL 허용 -->
+        <if test="culturePair != null and culturePair != ''">
+            AND (culture_pair IS NULL OR culture_pair = #{culturePair})
+        </if>
+
+        <if test="versionTag != null and versionTag != ''">
+            AND version_tag = #{versionTag}
+        </if>
+    </select>
+
+    <!-- 룰 페이지 조회 -->
+    <select id="selectRules" parameterType="map" resultType="map">
+        SELECT
+          rule_id, active, agent_code, label, severity, weight, priority,
+          pattern_type, pattern_text, case_sensitive, negate,
+          speaker_locale, listener_locale, culture_pair,
+          explanation_tpl, suggestion_tpl, cooldown_sec, version_tag,
+          created_at, updated_at
+        FROM ${table}
+        WHERE 1=1
+        <if test="active != null">
+            AND active = #{active}
+        </if>
+        <if test="agentCodes != null and agentCodes.size() > 0">
+            AND agent_code IN
+            <foreach collection="agentCodes" item="ac" open="(" separator="," close=")">
+                #{ac}
+            </foreach>
+        </if>
+        <if test="speakerLocale != null and speakerLocale != ''">
+            AND (speaker_locale IS NULL OR #{speakerLocale} LIKE CONCAT(speaker_locale, '%'))
+        </if>
+        <if test="listenerLocale != null and listenerLocale != ''">
+            AND (listener_locale IS NULL OR #{listenerLocale} LIKE CONCAT(listener_locale, '%'))
+        </if>
+        <if test="culturePair != null and culturePair != ''">
+            AND (culture_pair IS NULL OR culture_pair = #{culturePair})
+        </if>
+        <if test="versionTag != null and versionTag != ''">
+            AND version_tag = #{versionTag}
+        </if>
+        ORDER BY priority ASC, severity DESC, rule_id ASC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <!-- 쿨다운 체크 & 마킹: ON DUP KEY + IF 로 0/1/2 반환값 활용 -->
+    <insert id="checkAndMarkEvent" parameterType="map">
+        INSERT INTO tl_manner_events (rule_id, session_id, speaker_id, last_alert_at)
+        VALUES (#{ruleId}, #{sessionId}, #{speakerId}, NOW())
+        ON DUPLICATE KEY UPDATE
+          last_alert_at = IF(
+            last_alert_at &lt; (NOW() - INTERVAL #{cooldownSec} SECOND),
+            VALUES(last_alert_at),
+            last_alert_at
+          )
+    </insert>
+
+    <select id="findEvent" parameterType="map" resultType="map">
+        SELECT rule_id, session_id, speaker_id, last_alert_at
+        FROM tl_manner_events
+        WHERE rule_id = #{ruleId}
+          AND session_id &lt;=&gt; #{sessionId}   <!-- NULL-safe equal -->
+          AND speaker_id &lt;=&gt; #{speakerId}
+    </select>
+
+</mapper>
