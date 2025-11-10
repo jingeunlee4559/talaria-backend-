@@ -35,7 +35,8 @@ public interface DocumentMapper {
                @Param("size") long size,
                @Param("sha256") String sha256,
                @Param("originalLang") String originalLang,
-               @Param("storageKey") String storageKey);
+               @Param("storageKey") String storageKey,
+               @Param("useContextRag") boolean useContextRag);
 
     long lastInsertId();
 

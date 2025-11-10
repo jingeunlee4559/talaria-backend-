@@ -62,7 +62,8 @@ public class DocumentController {
             @RequestPart("file") MultipartFile file,
             @RequestParam(name = "original_name", required = false) String originalName,
             @RequestParam(name = "meeting_id",  required = false) Long meetingId,
-            @RequestParam(name = "original_lang", defaultValue = "ko") String originalLang
+            @RequestParam(name = "original_lang", defaultValue = "ko") String originalLang,
+            @RequestParam(name = "use_context_rag", required = false) Boolean useContextRag
     ) {
         if (file == null || file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -79,7 +80,7 @@ public class DocumentController {
                     ? originalName
                     : info.originalName;
 
-            // 2) DB INSERT
+            // 2) DB INSERT (use_context_rag 포함)
             var created = service.create(
                     userId,
                     meetingId,
@@ -89,7 +90,8 @@ public class DocumentController {
                     info.size,               // size
                     info.sha256,             // sha256(64hex)
                     originalLang,            // original_lang
-                    info.pathAbsolute        // storage_key (절대경로)
+                    info.pathAbsolute,       // storage_key (절대경로)
+                    useContextRag            // ▼ use_context_rag
             );
 
             Object idVal = created.getOrDefault("doc_id", created.getOrDefault("id", null));
@@ -198,6 +200,7 @@ public class DocumentController {
         return new SavedInfo(rel, abs, safeName, mimeType, size, sha256);
     }
 
+    // ===== use_context_rag 토글 (바디 없음) =====
     @PatchMapping("/{docId}/use-context-rag")
     public ResponseEntity<Map<String, Object>> toggleUseContextRag(
             @PathVariable("userId") long userId,
@@ -220,6 +223,7 @@ public class DocumentController {
         @NotBlank @Size(max = 512) private String storageKey;
     }
 
+    // (참고) 토글 API에서는 바디를 사용하지 않으므로 미사용
     @Data
     public static class ToggleUseContextRagRequest {
         @NotNull

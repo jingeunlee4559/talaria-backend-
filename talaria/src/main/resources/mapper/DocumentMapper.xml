@@ -51,10 +51,10 @@
   <insert id="insert">
     INSERT INTO ${table}
       (uploader_user_id, meeting_id, original_name, filepath,
-       mime_type, size, sha256, original_lang, storage_key, uploaded_at)
+       mime_type, size, sha256, original_lang, storage_key, uploaded_at,use_context_rag)
     VALUES
       (#{userId}, #{meetingId}, #{originalName}, #{filepath},
-       #{mimeType}, #{size}, #{sha256}, #{originalLang}, #{storageKey}, CURRENT_TIMESTAMP)
+       #{mimeType}, #{size}, #{sha256}, #{originalLang}, #{storageKey}, NOW() ,  #{useContextRag})
   </insert>
 
   <!-- 생성 직후 PK 회수 -->

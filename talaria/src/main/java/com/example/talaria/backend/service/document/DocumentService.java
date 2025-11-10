@@ -52,15 +52,24 @@ public class DocumentService {
     }
 
     // ========================= 업로드(멀티파트) =========================
-
-    /**
-     * 멀티파트 파일을 받아 DB에 기록(자동 리네임 반영) 후, 실제 파일을 docsRootDir 아래에 저장.
-     * - subdir: 선택. 예) "user/42/docs" (null이면 루트 바로 아래)
-     */
+    // (호환용) 기존 시그니처: useContextRag=false 디폴트
     @Transactional
     public Map<String, Object> createFromMultipart(long userId, Long meetingId,
                                                    MultipartFile file, String originalLang,
                                                    String subdir) throws IOException {
+        return createFromMultipart(userId, meetingId, file, originalLang, subdir, false);
+    }
+
+    /**
+     * 멀티파트 파일을 받아 DB에 기록(자동 리네임 반영) 후, 실제 파일을 docsRootDir 아래에 저장.
+     * - subdir: 선택. 예) "user/42/docs" (null이면 루트 바로 아래)
+     * - useContextRag: 문맥기반 번역 컨텍스트 사용 여부(POST 본문에서 수신)
+     */
+    @Transactional
+    public Map<String, Object> createFromMultipart(long userId, Long meetingId,
+                                                   MultipartFile file, String originalLang,
+                                                   String subdir,
+                                                   boolean useContextRag) throws IOException {
 
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("file is empty");
@@ -79,7 +88,11 @@ public class DocumentService {
         String requestedRelativePath = dir + safeName; // 예: "user/42/docs/report.pdf"
 
         // DB insert (자동 리네임 포함) → 최종 filepath 결정
-        Map<String, Object> row = create(userId, meetingId, safeName, requestedRelativePath, mimeType, size, sha256, originalLang, /*storageKey*/ null);
+        Map<String, Object> row = create(
+                userId, meetingId, safeName, requestedRelativePath,
+                mimeType, size, sha256, originalLang, /*storageKey*/ null,
+                useContextRag
+        );
 
         // DB에 최종 확정된 filepath 사용하여 실제 파일 저장
         String decidedRelPath = (String) row.get("filepath");
@@ -88,8 +101,8 @@ public class DocumentService {
         }
         writeToDisk(file, decidedRelPath); // 실패 시 예외 → 트랜잭션 롤백
 
-        // storage_key 컬럼을 스토리지 실제 경로로 갱신하고 싶으면 여기서 별도 update 수행 가능
-        // (Mapper에 update 추가 필요) 예: mapper.updateStorageKey(TABLE, (Long)row.get("doc_id"), decidedRelPath);
+        // storage_key를 스토리지 실제 경로로 갱신하려면 여기에 update 추가 가능
+        // mapper.updateStorageKey(TABLE, (Long) row.get("doc_id"), decidedRelPath);
 
         return row;
     }
@@ -104,16 +117,19 @@ public class DocumentService {
     @Transactional
     public Map<String, Object> create(long userId, Long meetingId,
                                       String originalName, String filepath, String mimeType,
-                                      long size, String sha256, String originalLang, String storageKey) {
+                                      long size, String sha256, String originalLang, String storageKey,
+                                      boolean useContextRag) {
 
         String decidedPath = filepath;
 
         // 1) 먼저 원래 경로로 시도
         try {
-            mapper.insert(TABLE, userId, meetingId, originalName, decidedPath, mimeType, size, sha256, originalLang, storageKey);
+            mapper.insert(TABLE, userId, meetingId, originalName, decidedPath,
+                    mimeType, size, sha256, originalLang, storageKey, useContextRag);
         } catch (DataIntegrityViolationException ex) {
             // 2) 충돌이면 자동 리네임으로 재시도
-            decidedPath = autoRenameAndInsert(userId, meetingId, originalName, filepath, mimeType, size, sha256, originalLang, storageKey);
+            decidedPath = autoRenameAndInsert(userId, meetingId, originalName, filepath,
+                    mimeType, size, sha256, originalLang, storageKey, useContextRag);
         }
 
         long id = mapper.lastInsertId();
@@ -195,7 +211,8 @@ public class DocumentService {
 
     private String autoRenameAndInsert(long userId, Long meetingId, String originalName,
                                        String originalFilepath, String mimeType, long size,
-                                       String sha256, String originalLang, String storageKey) {
+                                       String sha256, String originalLang, String storageKey,
+                                       boolean useContextRag) {
 
         PathParts parts = PathParts.parse(originalFilepath);
         int n = (parts.existingSuffix == null) ? 1 : (parts.existingSuffix + 1);
@@ -203,7 +220,8 @@ public class DocumentService {
         for (int i = 0; i < MAX_RETRY; i++, n++) {
             String candidate = parts.build(n);
             try {
-                mapper.insert(TABLE, userId, meetingId, originalName, candidate, mimeType, size, sha256, originalLang, storageKey);
+                mapper.insert(TABLE, userId, meetingId, originalName, candidate,
+                        mimeType, size, sha256, originalLang, storageKey, useContextRag);
                 return candidate;
             } catch (DataIntegrityViolationException ignore) {
                 // 충돌 → 다음 번호
@@ -252,13 +270,15 @@ public class DocumentService {
             return dir + (ext.isEmpty() ? stem : (stem + "." + ext));
         }
     }
+
+    // ========================= 토글 =========================
+
     @Transactional
     public Map<String, Object> toggleUseContextRag(long userId, long docId) {
         int updated = mapper.toggleUseContextRag(TABLE, userId, docId);
         if (updated <= 0) {
             throw new IllegalArgumentException("문서를 찾을 수 없거나 권한이 없습니다.");
         }
-        return mapper.selectOneByUser(TABLE, PK ,userId, docId);
+        return mapper.selectOneByUser(TABLE, PK, userId, docId);
     }
-
 }
