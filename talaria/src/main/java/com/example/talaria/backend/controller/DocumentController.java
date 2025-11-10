@@ -7,7 +7,11 @@ import jakarta.validation.constraints.*;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
@@ -55,6 +59,83 @@ public class DocumentController {
         return ResponseEntity.ok(service.getOneByUser(userId, docId));
     }
 
+    // ===== 🎯 파일 내용 읽기 엔드포인트 (새로 추가) =====
+    @GetMapping("/{docId}/content")
+    public ResponseEntity<?> getDocumentContent(
+            @PathVariable("userId") long userId,
+            @PathVariable("docId") long docId) {
+        
+        log.info("Get document content: userId={}, docId={}", userId, docId);
+        
+        try {
+            var content = service.getDocumentContent(userId, docId);
+            return ResponseEntity.ok(content);
+            
+        } catch (SecurityException se) {
+            log.error("Security exception: userId={}, docId={}", userId, docId, se);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "접근 권한이 없습니다."));
+        } catch (UnsupportedOperationException ue) {
+            log.warn("Unsupported file type: userId={}, docId={}", userId, docId, ue);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", ue.getMessage()));
+        } catch (Exception e) {
+            log.error("Get content failed: userId={}, docId={}", userId, docId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "파일 내용을 읽는 중 오류가 발생했습니다."));
+        }
+    }
+
+    // ===== 다운로드 엔드포인트 =====
+    @GetMapping("/{docId}/download")
+    public ResponseEntity<?> download(
+            @PathVariable("userId") long userId,
+            @PathVariable("docId") long docId) {
+        
+        log.info("Download requested: userId={}, docId={}", userId, docId);
+        
+        try {
+            var f = service.getFileForDownload(userId, docId);
+
+            Path file = f.path();
+            if (!Files.exists(file) || !Files.isRegularFile(file)) {
+                log.warn("File not found: {}", file);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "파일을 찾을 수 없습니다."));
+            }
+
+            String contentType = Files.probeContentType(file);
+            if (contentType == null || contentType.isBlank()) {
+                contentType = "application/octet-stream";
+            }
+
+            String downloadName = f.downloadName();
+            String cdFilenameStar = "filename*=UTF-8''" + 
+                java.net.URLEncoder.encode(downloadName, java.nio.charset.StandardCharsets.UTF_8);
+            String cd = "attachment; " + cdFilenameStar;
+
+            InputStreamResource resource = new InputStreamResource(Files.newInputStream(file));
+            long size = Files.size(file);
+
+            log.info("Download success: userId={}, docId={}, file={}", userId, docId, downloadName);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, cd)
+                    .header(HttpHeaders.CONTENT_TYPE, contentType)
+                    .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(size))
+                    .body(resource);
+
+        } catch (SecurityException se) {
+            log.error("Security exception: userId={}, docId={}", userId, docId, se);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "접근 권한이 없습니다."));
+        } catch (Exception e) {
+            log.error("Download failed: userId={}, docId={}", userId, docId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "다운로드 처리 중 오류가 발생했습니다."));
+        }
+    }
+
     // ===== 생성(업로드) =====
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> create(
@@ -72,26 +153,23 @@ public class DocumentController {
         }
 
         try {
-            // 1) 파일 저장 (yyyy/MM/dd/ 하위에 저장, sha256/size/mimeType 계산)
             var info = writeFileAndHash(file);
 
-            // original_name이 비어있으면, 저장 시 sanitize된 원본명 사용
             String effectiveOriginalName = StringUtils.hasText(originalName)
                     ? originalName
                     : info.originalName;
 
-            // 2) DB INSERT (use_context_rag 포함)
             var created = service.create(
                     userId,
                     meetingId,
-                    effectiveOriginalName,   // original_name
-                    info.pathRelative,       // filepath (저장소 기준 상대경로)
-                    info.mimeType,           // mime_type
-                    info.size,               // size
-                    info.sha256,             // sha256(64hex)
-                    originalLang,            // original_lang
-                    info.pathAbsolute,       // storage_key (절대경로)
-                    useContextRag            // ▼ use_context_rag
+                    effectiveOriginalName,
+                    info.pathRelative,
+                    info.mimeType,
+                    info.size,
+                    info.sha256,
+                    originalLang,
+                    info.pathAbsolute,
+                    useContextRag != null && useContextRag
             );
 
             Object idVal = created.getOrDefault("doc_id", created.getOrDefault("id", null));
@@ -100,7 +178,6 @@ public class DocumentController {
             return ResponseEntity.created(location).body(created);
 
         } catch (DataIntegrityViolationException ex) {
-            // UNIQUE(filepath/sha256/storage_key) 충돌 등
             log.warn("Document create conflict", ex);
             return ResponseEntity.status(409).body(Map.of(
                     "type", "about:blank",
@@ -138,10 +215,22 @@ public class DocumentController {
         return ResponseEntity.ok(Map.of("deleted", n));
     }
 
+    // ===== use_context_rag 토글 =====
+    @PatchMapping("/{docId}/use-context-rag")
+    public ResponseEntity<Map<String, Object>> toggleUseContextRag(
+            @PathVariable("userId") long userId,
+            @PathVariable("docId") long docId,
+            @RequestBody(required = false) Map<String, Object> body) {
+        
+        log.info("Toggle useContextRag: userId={}, docId={}, body={}", userId, docId, body);
+        
+        var row = service.toggleUseContextRag(userId, docId);
+        return ResponseEntity.ok(row);
+    }
+
     // ===== 내부 유틸 =====
     private static String sanitizeFilename(String name) {
         if (name == null) return "upload.bin";
-        // Windows 금지 문자 제거
         return name.replaceAll("[\\\\/:*?\"<>|]", "_");
     }
 
@@ -160,10 +249,6 @@ public class DocumentController {
             String sha256
     ) {}
 
-    /**
-     * 파일을 storage.documents.root 아래 yyyy/MM/dd 경로에 저장하고
-     * sha256/size/mimeType/상대경로/절대경로를 반환
-     */
     private SavedInfo writeFileAndHash(MultipartFile file) throws IOException, NoSuchAlgorithmException {
         String original = Optional.ofNullable(file.getOriginalFilename()).orElse("upload.bin");
         String safeName = sanitizeFilename(original);
@@ -175,11 +260,9 @@ public class DocumentController {
                 + "/" + String.format("%02d", today.getDayOfMonth()));
         Files.createDirectories(dir);
 
-        // 동일 파일명 충돌 방지: epoch_ms_prefix + 원본명
         String uniqueName = System.currentTimeMillis() + "_" + safeName;
         Path dest = dir.resolve(uniqueName);
 
-        // 스트리밍으로 sha256 계산 + 저장
         MessageDigest md = MessageDigest.getInstance("SHA-256");
         try (InputStream in = new BufferedInputStream(file.getInputStream());
              DigestInputStream din = new DigestInputStream(in, md)) {
@@ -200,22 +283,11 @@ public class DocumentController {
         return new SavedInfo(rel, abs, safeName, mimeType, size, sha256);
     }
 
-    // ===== use_context_rag 토글 (바디 없음) =====
-    @PatchMapping("/{docId}/use-context-rag")
-    public ResponseEntity<Map<String, Object>> toggleUseContextRag(
-            @PathVariable("userId") long userId,
-            @PathVariable("docId") long docId) {
-
-        var row = service.toggleUseContextRag(userId, docId);
-        return ResponseEntity.ok(row);
-    }
-
-    // ===== (선택) JSON 바디용 DTO - 현재는 미사용이지만 남겨둠 =====
     @Data
     public static class CreateDocumentReq {
-        private Long meetingId; // nullable
+        private Long meetingId;
         @NotBlank @Size(max = 255) private String originalName;
-        @NotBlank @Size(max = 255) private String filepath;     // UNIQUE
+        @NotBlank @Size(max = 255) private String filepath;
         @NotBlank @Size(max = 100) private String mimeType;
         @Positive private long size;
         @NotBlank @Pattern(regexp = "^[0-9a-fA-F]{64}$") private String sha256;
@@ -223,7 +295,6 @@ public class DocumentController {
         @NotBlank @Size(max = 512) private String storageKey;
     }
 
-    // (참고) 토글 API에서는 바디를 사용하지 않으므로 미사용
     @Data
     public static class ToggleUseContextRagRequest {
         @NotNull

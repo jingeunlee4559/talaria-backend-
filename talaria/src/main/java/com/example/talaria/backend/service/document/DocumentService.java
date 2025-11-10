@@ -3,6 +3,13 @@ package com.example.talaria.backend.service.document;
 import com.example.talaria.backend.dto.common.PageResponse;
 import com.example.talaria.backend.mapper.document.DocumentMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.poi.hwpf.HWPFDocument;
+import org.apache.poi.hwpf.extractor.WordExtractor;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -13,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.*;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
@@ -22,19 +30,19 @@ import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DocumentService {
 
     private final DocumentMapper mapper;
 
     private static final String TABLE = "tl_documents";
     private static final String PK    = "doc_id";
-    private static final int    MAX_RETRY = 50; // 자동 리네임 최대 재시도
+    private static final int    MAX_RETRY = 50;
 
-    // 기본 저장 루트 (application.yaml에서 주입). 미지정 시 개발용 디폴트
-    @Value("${app.upload.docs-dir:talaria-backend/talaria/src/main/resources/uploadfile/docs}")
+    @Value("${storage.documents.root:./data/uploads/docs}")
     private String docsRootDir;
 
-    // ========================= 조회/단건 =========================
+    // ========================= Query Methods =========================
 
     public PageResponse listByUser(long userId, Long meetingId, int page, int size) {
         if (size > 100) size = 100;
@@ -47,12 +55,14 @@ public class DocumentService {
 
     public Map<String, Object> getOneByUser(long userId, long docId) {
         var row = mapper.selectOneByUser(TABLE, PK, userId, docId);
-        if (row == null || row.isEmpty()) throw new RuntimeException("Document not found or not owned");
+        if (row == null || row.isEmpty()) {
+            throw new RuntimeException("Document not found or not owned");
+        }
         return row;
     }
 
-    // ========================= 업로드(멀티파트) =========================
-    // (호환용) 기존 시그니처: useContextRag=false 디폴트
+    // ========================= Upload Methods =========================
+    
     @Transactional
     public Map<String, Object> createFromMultipart(long userId, Long meetingId,
                                                    MultipartFile file, String originalLang,
@@ -60,11 +70,6 @@ public class DocumentService {
         return createFromMultipart(userId, meetingId, file, originalLang, subdir, false);
     }
 
-    /**
-     * 멀티파트 파일을 받아 DB에 기록(자동 리네임 반영) 후, 실제 파일을 docsRootDir 아래에 저장.
-     * - subdir: 선택. 예) "user/42/docs" (null이면 루트 바로 아래)
-     * - useContextRag: 문맥기반 번역 컨텍스트 사용 여부(POST 본문에서 수신)
-     */
     @Transactional
     public Map<String, Object> createFromMultipart(long userId, Long meetingId,
                                                    MultipartFile file, String originalLang,
@@ -80,40 +85,26 @@ public class DocumentService {
         String mimeType = (file.getContentType() != null) ? file.getContentType() : "application/octet-stream";
         long size = file.getSize();
 
-        // 클라이언트가 sha256을 주지 않는 케이스 대비 서버 측 계산
         String sha256 = sha256Hex(file.getInputStream());
 
-        // 클라이언트가 원하는 상대경로(디렉토리 포함) 구성
         String dir = (StringUtils.hasText(subdir) ? normalizeRelDir(subdir) + "/" : "");
-        String requestedRelativePath = dir + safeName; // 예: "user/42/docs/report.pdf"
+        String requestedRelativePath = dir + safeName;
 
-        // DB insert (자동 리네임 포함) → 최종 filepath 결정
         Map<String, Object> row = create(
                 userId, meetingId, safeName, requestedRelativePath,
-                mimeType, size, sha256, originalLang, /*storageKey*/ null,
+                mimeType, size, sha256, originalLang, null,
                 useContextRag
         );
 
-        // DB에 최종 확정된 filepath 사용하여 실제 파일 저장
         String decidedRelPath = (String) row.get("filepath");
         if (!StringUtils.hasText(decidedRelPath)) {
             throw new IllegalStateException("Decided filepath not returned from DB");
         }
-        writeToDisk(file, decidedRelPath); // 실패 시 예외 → 트랜잭션 롤백
-
-        // storage_key를 스토리지 실제 경로로 갱신하려면 여기에 update 추가 가능
-        // mapper.updateStorageKey(TABLE, (Long) row.get("doc_id"), decidedRelPath);
+        writeToDisk(file, decidedRelPath);
 
         return row;
     }
 
-    // ========================= 업로드(DB insert + 자동 리네임) =========================
-
-    /**
-     * filepath UNIQUE 위반 시 서버가 자동으로 (n) suffix를 붙여 재시도하여 저장합니다.
-     * - 예) report.pdf -> report(1).pdf -> report(2).pdf ...
-     * - 확장자 없는 경우: README -> README(1) ...
-     */
     @Transactional
     public Map<String, Object> create(long userId, Long meetingId,
                                       String originalName, String filepath, String mimeType,
@@ -122,18 +113,15 @@ public class DocumentService {
 
         String decidedPath = filepath;
 
-        // 1) 먼저 원래 경로로 시도
         try {
             mapper.insert(TABLE, userId, meetingId, originalName, decidedPath,
                     mimeType, size, sha256, originalLang, storageKey, useContextRag);
         } catch (DataIntegrityViolationException ex) {
-            // 2) 충돌이면 자동 리네임으로 재시도
             decidedPath = autoRenameAndInsert(userId, meetingId, originalName, filepath,
                     mimeType, size, sha256, originalLang, storageKey, useContextRag);
         }
 
         long id = mapper.lastInsertId();
-        // 최종 저장된 레코드 반환 (여기에 filepath가 포함되어 있으므로 createFromMultipart에서 사용)
         return mapper.selectOneByUser(TABLE, PK, userId, id);
     }
 
@@ -141,21 +129,170 @@ public class DocumentService {
         return mapper.deleteByUser(TABLE, PK, userId, docId);
     }
 
-    // ========================= 파일 저장 유틸 =========================
+    // ========================= File Content Reading =========================
+
+    public Map<String, Object> getDocumentContent(long userId, long docId) throws IOException {
+        Map<String, Object> row = mapper.selectOneByUser(TABLE, PK, userId, docId);
+        if (row == null || row.isEmpty()) {
+            throw new SecurityException("Document not found or access denied");
+        }
+
+        String rel = asString(row.get("filepath"));
+        String originalName = asString(row.get("original_name"));
+        String mimeType = asString(row.get("mime_type"));
+        String originalLang = asString(row.get("original_lang"));
+
+        if (rel == null || rel.isBlank()) {
+            throw new IllegalStateException("Filepath not found in DB");
+        }
+
+        Path root = Paths.get(docsRootDir).toAbsolutePath().normalize();
+        Path target = root.resolve(rel.replace('\\', '/')).normalize();
+
+        if (!target.startsWith(root)) {
+            throw new SecurityException("Invalid path");
+        }
+
+        if (!Files.exists(target) || !Files.isRegularFile(target)) {
+            throw new IOException("File not found");
+        }
+
+        String content;
+        try {
+            content = readFileContent(target, mimeType);
+        } catch (UnsupportedOperationException e) {
+            log.warn("Unsupported file type: {}", target.getFileName(), e);
+            throw e;
+        }
+
+        return Map.of(
+                "doc_id", docId,
+                "original_name", originalName,
+                "mime_type", mimeType,
+                "original_lang", originalLang,
+                "original_content", content,
+                "has_translation", false,
+                "translated_content", ""
+        );
+    }
+
+    /**
+     * Extract text from various file formats
+     */
+    private String readFileContent(Path file, String mimeType) throws IOException {
+        long size = Files.size(file);
+        if (size > 50 * 1024 * 1024) {
+            throw new UnsupportedOperationException("File too large (max 50MB)");
+        }
+
+        String fileName = file.getFileName().toString().toLowerCase();
+
+        try {
+            // PDF
+            if (fileName.endsWith(".pdf") || 
+                (mimeType != null && mimeType.equals("application/pdf"))) {
+                return extractTextFromPDF(file);
+            }
+
+            // DOCX (Office 2007+)
+            if (fileName.endsWith(".docx") || 
+                (mimeType != null && mimeType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))) {
+                return extractTextFromDOCX(file);
+            }
+
+            // DOC (Old Word)
+            if (fileName.endsWith(".doc") || 
+                (mimeType != null && mimeType.equals("application/msword"))) {
+                return extractTextFromDOC(file);
+            }
+
+            // HWP - Not supported yet
+            if (fileName.endsWith(".hwp")) {
+                throw new UnsupportedOperationException(
+                    "HWP file preview is not currently supported. Please download the file to view it.");
+            }
+
+            // Text files
+            if (mimeType != null && (
+                    mimeType.startsWith("text/") ||
+                    mimeType.equals("application/json") ||
+                    mimeType.equals("application/xml")
+            )) {
+                return Files.readString(file, StandardCharsets.UTF_8);
+            }
+
+            if (fileName.endsWith(".txt") || fileName.endsWith(".md") || 
+                fileName.endsWith(".csv") || fileName.endsWith(".json")) {
+                return Files.readString(file, StandardCharsets.UTF_8);
+            }
+
+            throw new UnsupportedOperationException("Unsupported file format: " + fileName);
+
+        } catch (UnsupportedOperationException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to read file: {}", file.getFileName(), e);
+            throw new IOException("Error reading file: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Extract text from PDF using PDFBox 2.x
+     */
+    private String extractTextFromPDF(Path file) throws IOException {
+        try (PDDocument document = PDDocument.load(file.toFile())) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            
+            int totalPages = document.getNumberOfPages();
+            if (totalPages > 50) {
+                stripper.setEndPage(50);
+                log.info("PDF has {} pages, extracting first 50", totalPages);
+            }
+            
+            String text = stripper.getText(document);
+            
+            if (totalPages > 50) {
+                text += "\n\n... [Showing first 50 of " + totalPages + " pages]";
+            }
+            
+            return text;
+        }
+    }
+
+    /**
+     * Extract text from DOCX (Office 2007+)
+     */
+    private String extractTextFromDOCX(Path file) throws IOException {
+        try (InputStream fis = Files.newInputStream(file);
+             XWPFDocument document = new XWPFDocument(fis);
+             XWPFWordExtractor extractor = new XWPFWordExtractor(document)) {
+            return extractor.getText();
+        }
+    }
+
+    /**
+     * Extract text from DOC (Old Word format)
+     */
+    private String extractTextFromDOC(Path file) throws IOException {
+        try (InputStream fis = Files.newInputStream(file);
+             HWPFDocument document = new HWPFDocument(fis);
+             WordExtractor extractor = new WordExtractor(document)) {
+            return extractor.getText();
+        }
+    }
+
+    // ========================= File Storage Utils =========================
 
     private void writeToDisk(MultipartFile file, String decidedRelPath) throws IOException {
         Path root = Paths.get(docsRootDir).toAbsolutePath().normalize();
         Path target = root.resolve(decidedRelPath).normalize();
 
-        // 경로 역탐색 방지
         if (!target.startsWith(root)) {
             throw new SecurityException("Invalid path traversal detected: " + decidedRelPath);
         }
 
-        // 상위 디렉토리 생성
         Files.createDirectories(target.getParent());
 
-        // 원자적 쓰기: 임시파일에 저장 후 move
         Path tmp = Files.createTempFile(target.getParent(), ".upload-", ".part");
         try (InputStream in = file.getInputStream()) {
             Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
@@ -164,18 +301,15 @@ public class DocumentService {
             throw e;
         }
 
-        // 기존 동일 파일이 우연히 있을 수 있으니 REPLACE_EXISTING
         Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
     }
 
     private static String sanitizeFilename(String original) {
         if (!StringUtils.hasText(original)) return "unnamed";
-        String base = Paths.get(original).getFileName().toString();  // 경로 제거
-        // 제어문자/금지문자 제거
+        String base = Paths.get(original).getFileName().toString();
         base = base.replaceAll("[\\p{Cntrl}]", "");
-        base = base.replaceAll("[<>:\"\\\\/|?*]", "_"); // Windows 금지문자
+        base = base.replaceAll("[<>:\"\\\\/|?*]", "_");
         if (!StringUtils.hasText(base)) base = "unnamed";
-        // 너무 긴 이름 방지 (예: 200자 제한)
         if (base.length() > 200) base = base.substring(0, 200);
         return base;
     }
@@ -185,11 +319,9 @@ public class DocumentService {
         return (dot > 0 && dot < filename.length() - 1) ? filename.substring(dot + 1) : "";
     }
 
-    /** 사용자가 보낸 subdir를 상대 경로로 정규화 (역탐색 차단) */
     private static String normalizeRelDir(String subdir) {
         String s = subdir.trim().replace('\\', '/');
-        s = s.replaceAll("^/+", "").replaceAll("/+$", ""); // 앞/뒤 슬래시 제거
-        // 위험 패턴 제거
+        s = s.replaceAll("^/+", "").replaceAll("/+$", "");
         if (s.contains("..")) throw new SecurityException("Invalid subdir");
         if (s.contains("//")) s = s.replaceAll("/+", "/");
         return s;
@@ -207,7 +339,7 @@ public class DocumentService {
         }
     }
 
-    // ================= 자동 리네임 유틸/로직 =================
+    // ================= Auto-rename logic =================
 
     private String autoRenameAndInsert(long userId, Long meetingId, String originalName,
                                        String originalFilepath, String mimeType, long size,
@@ -224,18 +356,16 @@ public class DocumentService {
                         mimeType, size, sha256, originalLang, storageKey, useContextRag);
                 return candidate;
             } catch (DataIntegrityViolationException ignore) {
-                // 충돌 → 다음 번호
             }
         }
-        throw new IllegalStateException("파일명 자동 리네임 실패: 재시도 한도 초과 (" + MAX_RETRY + ")");
+        throw new IllegalStateException("Auto-rename failed: max retries exceeded (" + MAX_RETRY + ")");
     }
 
-    /** "a/b/report(3).pdf" -> dir="a/b/", base="report", ext="pdf", existingSuffix=3 */
     private static class PathParts {
-        final String dir;             // 끝에 '/' 포함 또는 빈 문자열
-        final String base;            // 괄호-번호 제거된 파일명(확장자 제외)
-        final String ext;             // 확장자(없으면 빈 문자열)
-        final Integer existingSuffix; // 기존 (n)
+        final String dir;
+        final String base;
+        final String ext;
+        final Integer existingSuffix;
 
         private static final Pattern SUFFIX_RE = Pattern.compile("^(.*)\\((\\d+)\\)$");
 
@@ -271,14 +401,51 @@ public class DocumentService {
         }
     }
 
-    // ========================= 토글 =========================
+    // ========================= Toggle =========================
 
     @Transactional
     public Map<String, Object> toggleUseContextRag(long userId, long docId) {
         int updated = mapper.toggleUseContextRag(TABLE, userId, docId);
         if (updated <= 0) {
-            throw new IllegalArgumentException("문서를 찾을 수 없거나 권한이 없습니다.");
+            throw new IllegalArgumentException("Document not found or access denied");
         }
         return mapper.selectOneByUser(TABLE, PK, userId, docId);
+    }
+
+    // ========================= Download =========================
+
+    public record DownloadFile(Path path, String downloadName, String mimeType) {}
+
+    public DownloadFile getFileForDownload(long userId, long docId) {
+        Map<String, Object> row = mapper.selectOneByUser(TABLE, PK, userId, docId);
+        if (row == null || row.isEmpty()) {
+            throw new SecurityException("Document not found or access denied");
+        }
+
+        String rel = asString(row.get("filepath"));
+        String originalName = asString(row.get("original_name"));
+        String mimeType = asString(row.get("mime_type"));
+
+        if (rel == null || rel.isBlank()) {
+            throw new IllegalStateException("Filepath not found in DB");
+        }
+
+        Path root = Paths.get(docsRootDir).toAbsolutePath().normalize();
+        Path target = root.resolve(rel.replace('\\', '/')).normalize();
+
+        if (!target.startsWith(root)) {
+            throw new SecurityException("Invalid path");
+        }
+
+        String downloadName = (originalName != null && !originalName.isBlank())
+                ? originalName
+                : target.getFileName().toString();
+
+        return new DownloadFile(target, downloadName, (mimeType == null || mimeType.isBlank())
+                ? "application/octet-stream" : mimeType);
+    }
+
+    private static String asString(Object v) {
+        return (v == null) ? null : String.valueOf(v);
     }
 }
