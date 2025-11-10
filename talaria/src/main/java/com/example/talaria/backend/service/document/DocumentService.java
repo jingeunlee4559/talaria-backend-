@@ -252,4 +252,13 @@ public class DocumentService {
             return dir + (ext.isEmpty() ? stem : (stem + "." + ext));
         }
     }
+    @Transactional
+    public Map<String, Object> toggleUseContextRag(long userId, long docId) {
+        int updated = mapper.toggleUseContextRag(TABLE, userId, docId);
+        if (updated <= 0) {
+            throw new IllegalArgumentException("문서를 찾을 수 없거나 권한이 없습니다.");
+        }
+        return mapper.selectOneByUser(TABLE, PK ,userId, docId);
+    }
+
 }

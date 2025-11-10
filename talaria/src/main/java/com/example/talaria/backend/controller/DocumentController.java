@@ -198,6 +198,15 @@ public class DocumentController {
         return new SavedInfo(rel, abs, safeName, mimeType, size, sha256);
     }
 
+    @PatchMapping("/{docId}/use-context-rag")
+    public ResponseEntity<Map<String, Object>> toggleUseContextRag(
+            @PathVariable("userId") long userId,
+            @PathVariable("docId") long docId) {
+
+        var row = service.toggleUseContextRag(userId, docId);
+        return ResponseEntity.ok(row);
+    }
+
     // ===== (선택) JSON 바디용 DTO - 현재는 미사용이지만 남겨둠 =====
     @Data
     public static class CreateDocumentReq {
@@ -209,5 +218,11 @@ public class DocumentController {
         @NotBlank @Pattern(regexp = "^[0-9a-fA-F]{64}$") private String sha256;
         @NotBlank @Size(max = 10) private String originalLang;
         @NotBlank @Size(max = 512) private String storageKey;
+    }
+
+    @Data
+    public static class ToggleUseContextRagRequest {
+        @NotNull
+        private Boolean enabled;
     }
 }

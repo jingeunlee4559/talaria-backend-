@@ -14,14 +14,15 @@
     </if>
   </select>
 
-  <!-- 페이지 조회: 업로더 이름 포함 -->
+  <!-- 페이지 조회 -->
   <select id="selectPageByUser" resultType="map">
     SELECT
       d.doc_id, d.uploader_user_id,
       u.name AS uploader_name,
       d.meeting_id,
       d.original_name, d.filepath, d.mime_type, d.size,
-      d.sha256, d.original_lang, d.storage_key, d.uploaded_at
+      d.sha256, d.original_lang, d.storage_key, d.uploaded_at,
+      d.use_context_rag
     FROM ${table} d
     LEFT JOIN tl_users u ON u.user_id = d.uploader_user_id
     WHERE d.uploader_user_id = #{userId}
@@ -32,20 +33,20 @@
     LIMIT #{limit} OFFSET #{offset}
   </select>
 
-  <!-- 단건 조회: 업로더 이름 포함 -->
+  <!-- 단건 조회 -->
   <select id="selectOneByUser" resultType="map">
     SELECT
       d.doc_id, d.uploader_user_id,
       u.name AS uploader_name,
       d.meeting_id,
       d.original_name, d.filepath, d.mime_type, d.size,
-      d.sha256, d.original_lang, d.storage_key, d.uploaded_at
+      d.sha256, d.original_lang, d.storage_key, d.uploaded_at,
+      d.use_context_rag
     FROM ${table} d
     LEFT JOIN tl_users u ON u.user_id = d.uploader_user_id
     WHERE d.doc_id = #{docId}
       AND d.uploader_user_id = #{userId}
   </select>
-
   <!-- 생성: useGeneratedKeys 제거 (→ LAST_INSERT_ID 사용) -->
   <insert id="insert">
     INSERT INTO ${table}
@@ -67,5 +68,13 @@
     WHERE doc_id = #{docId}
       AND uploader_user_id = #{userId}
   </delete>
+
+  <!--  토글 업데이트 -->
+  <update id="toggleUseContextRag">
+    UPDATE ${table}
+    SET use_context_rag = CASE WHEN use_context_rag = 1 THEN 0 ELSE 1 END
+    WHERE doc_id = #{docId}
+      AND uploader_user_id = #{userId}
+  </update>
 
 </mapper>

@@ -43,4 +43,9 @@ public interface DocumentMapper {
                      @Param("pk") String pk,
                      @Param("userId") long userId,
                      @Param("docId") long docId);
+
+    int toggleUseContextRag(
+                    @Param("table") String table,
+                    @Param("userId") long userId,
+                    @Param("docId") long docId);
 }

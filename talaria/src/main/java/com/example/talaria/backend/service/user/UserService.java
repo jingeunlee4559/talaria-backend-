@@ -32,6 +32,6 @@ public class UserService {
         return userMapper.searchByKeyword(keyword);
     }
     public Map<String,Object> getById(long id) {
-        return userMapper.findById(id);    // { user_id, email, name, locale, ... }
+        return userMapper.findById(id); 
     }
 }
