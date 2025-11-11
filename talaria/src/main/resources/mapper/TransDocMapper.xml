@@ -118,5 +118,43 @@
     ORDER BY COALESCE(t.translated_at, t.created_at) DESC, t.request_id DESC
     LIMIT #{limit} OFFSET #{offset}
   </select>
+  <select id="selectOneForDownloadByRequestId" resultType="map">
+    SELECT
+      t.translated_rel_path,
+      t.target_language,
+      t.provider,
+      t.size_bytes,
+      t.checksum_sha256,
+      t.translated_at,
+      d.original_name,
+      d.filepath AS original_filepath
+    FROM ${table} t
+    JOIN tl_documents d ON d.doc_id = t.original_doc_id
+    WHERE d.uploader_user_id = #{userId}
+      AND t.request_id = #{requestId}
+    LIMIT 1
+  </select>
+
+  <select id="selectOneForDownloadByComposite" resultType="map">
+    SELECT
+      t.translated_rel_path,
+      t.target_language,
+      t.provider,
+      t.size_bytes,
+      t.checksum_sha256,
+      t.translated_at,
+      d.original_name,
+      d.filepath AS original_filepath
+    FROM ${table} t
+    JOIN tl_documents d ON d.doc_id = t.original_doc_id
+    WHERE d.uploader_user_id = #{userId}
+      AND t.original_doc_id = #{docId}
+      AND t.target_language = #{targetLang}
+    <if test="provider != null and provider != ''">
+      AND t.provider = #{provider}
+    </if>
+    ORDER BY t.translated_at DESC
+    LIMIT 1
+  </select>
 
 </mapper>

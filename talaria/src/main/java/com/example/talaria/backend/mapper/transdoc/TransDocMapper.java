@@ -51,4 +51,15 @@ public interface TransDocMapper {
                                                @Param("provider") String provider,
                                                @Param("limit") int limit,
                                                @Param("offset") int offset);
+
+    // ===== 신규: 다운로드 메타 =====
+    Map<String, Object> selectOneForDownloadByRequestId(@Param("table") String table,
+                                                        @Param("userId") long userId,
+                                                        @Param("requestId") String requestId);
+
+    Map<String, Object> selectOneForDownloadByComposite(@Param("table") String table,
+                                                        @Param("userId") long userId,
+                                                        @Param("docId") long docId,
+                                                        @Param("targetLang") String targetLang,
+                                                        @Param("provider") String provider);
 }

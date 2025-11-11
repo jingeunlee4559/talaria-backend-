@@ -72,4 +72,21 @@ public class TransDocService {
                 mapper.selectPageByUser(TABLE, userId, targetLang, provider, size, offset);
         return new PageResponse(items, page, size, total);
     }
+    @Transactional(readOnly = true)
+    public Map<String, Object> getTransDownloadInfoByRequestId(long userId, String requestId) {
+        Map<String,Object> row = mapper.selectOneForDownloadByRequestId(TABLE, userId, requestId);
+        if (row == null || row.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Translation not found or not owned");
+        }
+        return row;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getTransDownloadInfoByComposite(long userId, long docId, String targetLang, String provider) {
+        Map<String,Object> row = mapper.selectOneForDownloadByComposite(TABLE, userId, docId, targetLang, provider);
+        if (row == null || row.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Translation not found for given keys");
+        }
+        return row;
+    }
 }
