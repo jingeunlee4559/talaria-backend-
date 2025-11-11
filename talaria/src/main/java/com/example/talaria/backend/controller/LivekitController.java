@@ -2,7 +2,6 @@ package com.example.talaria.backend.controller;
 
 import com.example.talaria.backend.config.LivekitConfig;
 import com.example.talaria.backend.mapper.user.UserMapper;
-import com.example.talaria.backend.model.User;
 import com.example.talaria.backend.service.LivekitAdminService;
 import com.example.talaria.backend.service.LivekitService;
 import com.example.talaria.backend.service.meeting.MeetingService;
@@ -18,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -31,7 +31,7 @@ public class LivekitController {
   private final LivekitConfig cfg;
   private final MeetingService meetingService;
   private final LivekitAdminService adminService;
-  private final UserMapper userMapper; // ✅ 사용자 locale 조회용
+  private final UserMapper userMapper; // 사용자 locale 조회용
 
   @Autowired(required = false)
   private ParticipantService participantService; // 선택 주입
@@ -47,17 +47,6 @@ public class LivekitController {
       String title,
       String defaultLang,
       @JsonProperty("userId") @JsonAlias("user_id") Long userId
-  ) {}
-
-  /** 응답에 userLocale 추가 */
-  public record TokenRes(
-      String wsUrl,
-      String token,
-      String room,
-      String identity,
-      long ttlSec,
-      String userLocale,            // ✅ 추가
-      Map<String,Object> meeting
   ) {}
 
   private static final Pattern VALID = Pattern.compile("^[A-Za-z0-9_-]{1,64}$");
@@ -170,18 +159,18 @@ public class LivekitController {
     // 사용자 locale (tl_users.locale) 조회 (없으면 ko-KR)
     String userLocale = "ko-KR";
     try {
-    Long uid = req.userId();
-    if (uid != null && uid > 0) {
+      Long uid = req.userId();
+      if (uid != null && uid > 0) {
         String loc = userMapper.findLocaleById(uid);
         if (loc != null && !loc.isBlank()) {
-            userLocale = toBcp47(loc); // 예: "ko" -> "ko-KR"
+          userLocale = toBcp47(loc); // 예: "ko" -> "ko-KR"
         }
-    }
+      }
     } catch (Exception ignore) {
       // 조회 실패해도 기본값 유지
     }
 
-    // 타겟/회의 기본 언어 → BCP47로 보정
+    // 회의 기본 언어 → BCP47로 보정
     String targetLocale = toBcp47(String.valueOf(meeting.getOrDefault("default_lang", "ko")));
 
     // 4) LiveKit 토큰(메타데이터 포함) 발급
@@ -190,11 +179,11 @@ public class LivekitController {
     );
 
     // 5) 참가자 JOIN 기록(실패 무시)
+    long meetingsId = ((Number) meeting.get("meetings_id")).longValue();
     if (participantService != null) {
       try {
         Long uid = req.userId();
         if (uid != null && uid > 0) {
-          long meetingsId = ((Number) meeting.get("meetings_id")).longValue();
           long hostId = meeting.get("host_id") == null ? -1L : ((Number) meeting.get("host_id")).longValue();
           String role = (uid == hostId) ? "HOST" : "GUEST";
           participantService.joined(meetingsId, uid, role);
@@ -204,9 +193,18 @@ public class LivekitController {
       }
     }
 
-    return ResponseEntity.ok(new TokenRes(
-        cfg.getWsUrl(), jwt, finalRoom, identity, ttl, userLocale, meeting
-    ));
+    // 6) A안: Map 응답 + meeting_id(snake_case) 포함
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("wsUrl", cfg.getWsUrl());
+    body.put("token", jwt);
+    body.put("room", finalRoom);
+    body.put("identity", identity);
+    body.put("ttlSec", ttl);
+    body.put("userLocale", userLocale);
+    body.put("meeting_id", meetingsId); // ← snake_case 추가
+    body.put("meeting", meeting);       // (호환 유지를 원하면 포함)
+
+    return ResponseEntity.ok(body);
   }
 
   @PostMapping("/ai/stt/token")
