@@ -30,52 +30,127 @@
     t.translated_at
   </sql>
 
-  <!-- ===== Flat: 총 행수 ===== -->
+  <!-- ===== Flat: 총 행수 (원문 + 번역 합산) ===== -->
   <select id="countCombinedByUser" resultType="long">
-    SELECT COUNT(*)
-    FROM tl_documents d
-    LEFT JOIN tl_trans_docs t
-      ON t.original_doc_id = d.doc_id
-    WHERE d.uploader_user_id = #{userId}
-    <if test="meetingId != null">
-      AND d.meeting_id = #{meetingId}
-    </if>
-    <if test="docId != null">
-      AND d.doc_id = #{docId}
-    </if>
-    <if test="targetLang != null and targetLang != ''">
-      AND t.target_language = #{targetLang}
-    </if>
-    <if test="provider != null and provider != ''">
-      AND t.provider = #{provider}
-    </if>
+    SELECT
+      (
+        SELECT COUNT(*)
+        FROM tl_documents d
+        WHERE d.uploader_user_id = #{userId}
+        <if test="meetingId != null">
+          AND d.meeting_id = #{meetingId}
+        </if>
+        <if test="docId != null">
+          AND d.doc_id = #{docId}
+        </if>
+      )
+      +
+      (
+        SELECT COUNT(*)
+        FROM tl_documents d
+        JOIN tl_trans_docs t
+          ON t.original_doc_id = d.doc_id
+        WHERE d.uploader_user_id = #{userId}
+        <if test="meetingId != null">
+          AND d.meeting_id = #{meetingId}
+        </if>
+        <if test="docId != null">
+          AND d.doc_id = #{docId}
+        </if>
+        <if test="targetLang != null and targetLang != ''">
+          AND t.target_language = #{targetLang}
+        </if>
+        <if test="provider != null and provider != ''">
+          AND t.provider = #{provider}
+        </if>
+      ) AS total
   </select>
 
-  <!-- ===== Flat: 페이지 조회 ===== -->
+  <!-- ===== Flat: 페이지 조회 (UNION ALL: 원문 + 번역) ===== -->
   <select id="selectCombinedPageByUser" resultType="map">
-    SELECT
-      <include refid="docColumns"/>,
-      <include refid="transColumns"/>
-    FROM tl_documents d
-    LEFT JOIN tl_trans_docs t
-      ON t.original_doc_id = d.doc_id
-    WHERE d.uploader_user_id = #{userId}
-    <if test="meetingId != null">
-      AND d.meeting_id = #{meetingId}
-    </if>
-    <if test="docId != null">
-      AND d.doc_id = #{docId}
-    </if>
-    <if test="targetLang != null and targetLang != ''">
-      AND t.target_language = #{targetLang}
-    </if>
-    <if test="provider != null and provider != ''">
-      AND t.provider = #{provider}
-    </if>
-    ORDER BY d.doc_id DESC,
-             (t.translated_at IS NULL) ASC,
-             t.translated_at DESC,
-             t.trans_doc_id DESC
+    SELECT *
+    FROM (
+      /* ---- 원문 행: 번역 컬럼은 NULL, 항상 1행 보장 ---- */
+      SELECT
+        d.doc_id,
+        d.uploader_user_id,
+        d.meeting_id,
+        d.original_name,
+        d.filepath,
+        d.mime_type,
+        d.size        AS doc_size,
+        d.sha256      AS doc_sha256,
+        d.original_lang,
+
+        NULL          AS trans_doc_id,
+        NULL          AS original_doc_id,
+        NULL          AS target_language,
+        NULL          AS translated_rel_path,
+        NULL          AS request_id,
+        NULL          AS provider,
+        NULL          AS size_bytes,
+        NULL          AS checksum_sha256,
+        NULL          AS translated_at,
+
+        'original'    AS row_type,
+        0             AS sort_ord
+      FROM tl_documents d
+      WHERE d.uploader_user_id = #{userId}
+      <if test="meetingId != null">
+        AND d.meeting_id = #{meetingId}
+      </if>
+      <if test="docId != null">
+        AND d.doc_id = #{docId}
+      </if>
+
+      UNION ALL
+
+      /* ---- 번역 행: 선택 필터 적용 ---- */
+      SELECT
+        d.doc_id,
+        d.uploader_user_id,
+        d.meeting_id,
+        d.original_name,
+        d.filepath,
+        d.mime_type,
+        d.size        AS doc_size,
+        d.sha256      AS doc_sha256,
+        d.original_lang,
+
+        t.trans_doc_id,
+        t.original_doc_id,
+        t.target_language,
+        t.translated_rel_path,
+        t.request_id,
+        t.provider,
+        t.size_bytes,
+        t.checksum_sha256,
+        t.translated_at,
+
+        'translation' AS row_type,
+        1             AS sort_ord
+      FROM tl_documents d
+      JOIN tl_trans_docs t
+        ON t.original_doc_id = d.doc_id
+      WHERE d.uploader_user_id = #{userId}
+      <if test="meetingId != null">
+        AND d.meeting_id = #{meetingId}
+      </if>
+      <if test="docId != null">
+        AND d.doc_id = #{docId}
+      </if>
+      <if test="targetLang != null and targetLang != ''">
+        AND t.target_language = #{targetLang}
+      </if>
+      <if test="provider != null and provider != ''">
+        AND t.provider = #{provider}
+      </if>
+    ) x
+    ORDER BY
+      x.doc_id DESC,
+      x.sort_ord ASC,          /* 원문 먼저, 번역 다음 */
+      x.translated_at DESC,
+      x.trans_doc_id DESC
     LIMIT #{limit} OFFSET #{offset}
   </select>
 
@@ -108,7 +183,7 @@
     LIMIT #{limit} OFFSET #{offset}
   </select>
 
-  <!-- ===== Grouped: 번역(선택 필터) - 대상 doc_id 집합 -->
+  <!-- ===== Grouped: 번역(선택 필터) - 대상 doc_id 집합 ===== -->
   <select id="selectTransByDocIds" resultType="map">
     SELECT
       <include refid="transColumns"/>
