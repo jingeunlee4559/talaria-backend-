@@ -46,4 +46,76 @@
       AND uploader_user_id = #{userId}
   </select>
 
+
+  <!-- 목록 카운트: 호스트 OR 링크추가자 OR 업로더 -->
+  <select id="countByUserAndMeeting" resultType="long">
+    SELECT COUNT(*)
+    FROM tl_meeting_documents md
+    JOIN tl_documents d ON d.doc_id = md.doc_id
+    JOIN tl_meetings m ON m.meetings_id = md.meeting_id
+    WHERE md.meeting_id = #{meetingId}
+      AND (
+        m.host_id = #{userId}
+        OR md.added_by_user_id = #{userId}
+        OR d.uploader_user_id = #{userId}
+      )
+  </select>
+
+  <!-- 페이징 목록 -->
+  <select id="selectPageByUserAndMeeting" resultType="map">
+    SELECT
+      md.id            AS link_id,
+      md.meeting_id,
+      md.doc_id,
+      md.added_by_user_id,
+      md.added_at,
+
+      d.uploader_user_id,
+      d.original_name,
+      d.filepath,
+      d.mime_type,
+      d.size,
+      d.sha256,
+      d.original_lang,
+
+      m.host_id,
+      m.title,
+      m.status,
+      m.default_lang
+    FROM tl_meeting_documents md
+    JOIN tl_documents d ON d.doc_id = md.doc_id
+    JOIN tl_meetings m ON m.meetings_id = md.meeting_id
+    WHERE md.meeting_id = #{meetingId}
+      AND (
+        m.host_id = #{userId}
+        OR md.added_by_user_id = #{userId}
+        OR d.uploader_user_id = #{userId}
+      )
+    ORDER BY md.added_at DESC, md.id DESC
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- 단건(다운로드용) -->
+  <select id="selectOneForDownload" resultType="map">
+    SELECT
+      d.doc_id,
+      d.original_name,
+      d.filepath,
+      d.mime_type,
+      d.size,
+      d.sha256,
+      md.added_at
+    FROM tl_meeting_documents md
+    JOIN tl_documents d ON d.doc_id = md.doc_id
+    JOIN tl_meetings m ON m.meetings_id = md.meeting_id
+    WHERE md.meeting_id = #{meetingId}
+      AND md.doc_id    = #{docId}
+      AND (
+        m.host_id = #{userId}
+        OR md.added_by_user_id = #{userId}
+        OR d.uploader_user_id = #{userId}
+      )
+    LIMIT 1
+  </select>
+
 </mapper>

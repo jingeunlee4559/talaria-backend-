@@ -1,11 +1,14 @@
 package com.example.talaria.backend.service.document;
 
+import com.example.talaria.backend.dto.common.PageResponse;
 import com.example.talaria.backend.mapper.document.MeetingDocumentMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 
@@ -16,8 +19,23 @@ public class MeetingDocumentService {
 
     private final MeetingDocumentMapper mapper;
 
+    // ===== 기존 목록 (권한 필터 없음, 호환 유지) =====
     public List<Map<String, Object>> listByMeeting(long meetingId) {
         return mapper.selectDocsByMeeting(meetingId);
+    }
+
+    // ===== 신규: 권한 포함 페이지 목록 =====
+    @Transactional(readOnly = true)
+    public PageResponse listByMeetingPaged(long userId, long meetingId, int page, int size) {
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
+        if (page < 0) page = 0;
+        int offset = page * size;
+
+        long total = mapper.countByUserAndMeeting(userId, meetingId);
+        List<Map<String, Object>> items =
+                mapper.selectPageByUserAndMeeting(userId, meetingId, size, offset);
+        return new PageResponse(items, page, size, total);
     }
 
     @Transactional
@@ -46,7 +64,7 @@ public class MeetingDocumentService {
             try {
                 success += mapper.insertMeetingDoc(meetingId, docId, userId);
             } catch (DataIntegrityViolationException ex) {
-                duplicated.add(docId); // UNIQUE (meeting_id, doc_id) 충돌 → 중복
+                duplicated.add(docId); // UNIQUE(meeting_id, doc_id) 충돌
             }
         }
 
@@ -73,5 +91,15 @@ public class MeetingDocumentService {
             success += mapper.deleteMeetingDoc(meetingId, docId);
         }
         return Map.of("deletedCount", success, "meeting_id", meetingId, "docIds", docIds);
+    }
+
+    // =====  다운로드용 메타 조회(권한 포함) =====
+    @Transactional(readOnly = true)
+    public Map<String, Object> getDownloadInfo(long userId, long meetingId, long docId) {
+        Map<String, Object> row = mapper.selectOneForDownload(userId, meetingId, docId);
+        if (row == null || row.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found or not permitted");
+        }
+        return row;
     }
 }
