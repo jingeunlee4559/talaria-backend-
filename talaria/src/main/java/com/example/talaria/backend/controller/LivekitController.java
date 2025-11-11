@@ -85,7 +85,6 @@ public class LivekitController {
     long ttl = normalizeTtl(req.ttlSec());
     String identity = req.identity();
     String displayName = isBlank(req.name()) ? "Guest" : trim(req.name(), 64);
-
     // 2) 회의 선택/생성
     Map<String,Object> meeting;
     try {
@@ -155,7 +154,6 @@ public class LivekitController {
 
     // 3) locale 결정
     String finalRoom = String.valueOf(meeting.get("invite_code"));
-
     // 사용자 locale (tl_users.locale) 조회 (없으면 ko-KR)
     String userLocale = "ko-KR";
     try {
@@ -174,12 +172,12 @@ public class LivekitController {
     String targetLocale = toBcp47(String.valueOf(meeting.getOrDefault("default_lang", "ko")));
 
     // 4) LiveKit 토큰(메타데이터 포함) 발급
+    long meetingsId = ((Number) meeting.get("meetings_id")).longValue();
     String jwt = service.createJoinTokenWithMeta(
-        finalRoom, identity, displayName, ttl, userLocale, targetLocale, req.userId()
+    finalRoom, identity, displayName, ttl, userLocale, targetLocale, req.userId(), meetingsId
     );
 
     // 5) 참가자 JOIN 기록(실패 무시)
-    long meetingsId = ((Number) meeting.get("meetings_id")).longValue();
     if (participantService != null) {
       try {
         Long uid = req.userId();
