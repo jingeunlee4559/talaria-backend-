@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.talaria.backend.mapper.document.DocumentAggMapper">
+
+  <!-- 공통 컬럼: 문서 -->
+  <sql id="docColumns">
+    d.doc_id,
+    d.uploader_user_id,
+    d.meeting_id,
+    d.original_name,
+    d.filepath,
+    d.mime_type,
+    d.size        AS doc_size,
+    d.sha256      AS doc_sha256,
+    d.original_lang
+  </sql>
+
+  <!-- 공통 컬럼: 번역 -->
+  <sql id="transColumns">
+    t.trans_doc_id,
+    t.original_doc_id,
+    t.target_language,
+    t.translated_rel_path,
+    t.request_id,
+    t.provider,
+    t.size_bytes,
+    t.checksum_sha256,
+    t.translated_at
+  </sql>
+
+  <!-- ===== Flat: 총 행수 ===== -->
+  <select id="countCombinedByUser" resultType="long">
+    SELECT COUNT(*)
+    FROM tl_documents d
+    LEFT JOIN tl_trans_docs t
+      ON t.original_doc_id = d.doc_id
+    WHERE d.uploader_user_id = #{userId}
+    <if test="meetingId != null">
+      AND d.meeting_id = #{meetingId}
+    </if>
+    <if test="docId != null">
+      AND d.doc_id = #{docId}
+    </if>
+    <if test="targetLang != null and targetLang != ''">
+      AND t.target_language = #{targetLang}
+    </if>
+    <if test="provider != null and provider != ''">
+      AND t.provider = #{provider}
+    </if>
+  </select>
+
+  <!-- ===== Flat: 페이지 조회 ===== -->
+  <select id="selectCombinedPageByUser" resultType="map">
+    SELECT
+      <include refid="docColumns"/>,
+      <include refid="transColumns"/>
+    FROM tl_documents d
+    LEFT JOIN tl_trans_docs t
+      ON t.original_doc_id = d.doc_id
+    WHERE d.uploader_user_id = #{userId}
+    <if test="meetingId != null">
+      AND d.meeting_id = #{meetingId}
+    </if>
+    <if test="docId != null">
+      AND d.doc_id = #{docId}
+    </if>
+    <if test="targetLang != null and targetLang != ''">
+      AND t.target_language = #{targetLang}
+    </if>
+    <if test="provider != null and provider != ''">
+      AND t.provider = #{provider}
+    </if>
+    ORDER BY d.doc_id DESC,
+             (t.translated_at IS NULL) ASC,
+             t.translated_at DESC,
+             t.trans_doc_id DESC
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- ===== Grouped: 문서 개수 (DISTINCT) ===== -->
+  <select id="countDistinctDocsByUser" resultType="long">
+    SELECT COUNT(DISTINCT d.doc_id)
+    FROM tl_documents d
+    WHERE d.uploader_user_id = #{userId}
+    <if test="meetingId != null">
+      AND d.meeting_id = #{meetingId}
+    </if>
+    <if test="docId != null">
+      AND d.doc_id = #{docId}
+    </if>
+  </select>
+
+  <!-- ===== Grouped: 문서 페이지 ===== -->
+  <select id="selectDocsPageByUser" resultType="map">
+    SELECT
+      <include refid="docColumns"/>
+    FROM tl_documents d
+    WHERE d.uploader_user_id = #{userId}
+    <if test="meetingId != null">
+      AND d.meeting_id = #{meetingId}
+    </if>
+    <if test="docId != null">
+      AND d.doc_id = #{docId}
+    </if>
+    ORDER BY d.doc_id DESC
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- ===== Grouped: 번역(선택 필터) - 대상 doc_id 집합 -->
+  <select id="selectTransByDocIds" resultType="map">
+    SELECT
+      <include refid="transColumns"/>
+    FROM tl_trans_docs t
+    JOIN tl_documents d
+      ON d.doc_id = t.original_doc_id
+     AND d.uploader_user_id = #{userId}
+    WHERE t.original_doc_id IN
+      <foreach item="id" collection="docIds" open="(" separator="," close=")">
+        #{id}
+      </foreach>
+    <if test="targetLang != null and targetLang != ''">
+      AND t.target_language = #{targetLang}
+    </if>
+    <if test="provider != null and provider != ''">
+      AND t.provider = #{provider}
+    </if>
+    ORDER BY t.original_doc_id DESC,
+             t.translated_at DESC,
+             t.trans_doc_id DESC
+  </select>
+
+</mapper>
