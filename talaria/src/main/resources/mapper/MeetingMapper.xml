@@ -4,7 +4,8 @@
   "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.talaria.backend.mapper.meeting.MeetingMapper">
 
-  <!-- 카운트 -->
+  <!-- 기존: host 기준 동적 테이블 쿼리들은 유지 (서비스에서 table/pk 상수 넘김) -->
+
   <select id="countByHost" resultType="long">
     SELECT COUNT(*)
     FROM ${table}
@@ -20,7 +21,6 @@
     </if>
   </select>
 
-  <!-- 목록 -->
   <select id="selectPageByHost" resultType="map">
     SELECT meetings_id, host_id, title, status, invite_code,
            default_lang, scheduled_at, created_at, updated_at, ended_at
@@ -39,7 +39,6 @@
     LIMIT #{limit} OFFSET #{offset}
   </select>
 
-  <!-- 단건(PK=meetings_id) -->
   <select id="selectOneByHost" resultType="map">
     SELECT meetings_id, host_id, title, status, invite_code,
            default_lang, scheduled_at, created_at, updated_at, ended_at
@@ -48,7 +47,6 @@
       AND host_id = #{hostId}
   </select>
 
-  <!-- 초대코드로 조회 -->
   <select id="selectByInviteCode" resultType="map">
     SELECT meetings_id, host_id, title, status, invite_code,
            default_lang, scheduled_at, created_at, updated_at, ended_at
@@ -57,7 +55,6 @@
     LIMIT 1
   </select>
 
-  <!-- 최근 활성(상태 유지 + 업데이트 최근) -->
   <select id="selectRecentActiveByHostAndTitle" resultType="map">
     SELECT meetings_id, host_id, title, status, invite_code,
            default_lang, scheduled_at, created_at, updated_at, ended_at
@@ -70,7 +67,6 @@
     LIMIT 1
   </select>
 
-  <!-- 생성 (scheduled_at NOT NULL 주의) -->
   <insert id="insert">
     INSERT INTO ${table}
       (host_id, title, status, invite_code, default_lang, scheduled_at)
@@ -82,7 +78,6 @@
     SELECT LAST_INSERT_ID()
   </select>
 
-  <!-- 부분 업데이트 -->
   <update id="updatePartial">
     UPDATE ${table}
     <set>
@@ -114,10 +109,8 @@
     WHERE ${pk} = #{id} AND host_id = #{hostId}
   </update>
 
-
-<!-- 목록 조회 시 참가자 정보 포함 -->
-<!-- 목록 조회 시 호스트 정보 포함 -->
-<select id="selectByUserIncludingParticipant" resultType="map">
+  <!-- 사용자 기준 조회 -->
+  <select id="selectByUserIncludingParticipant" resultType="map">
     SELECT DISTINCT
         m.meetings_id,
         m.host_id,
@@ -131,19 +124,19 @@
         CASE 
             WHEN m.host_id = #{userId} THEN 'HOST'
             ELSE COALESCE(p.role, 'GUEST')
-        END as user_role,
-        -- 호스트 정보 추가
-        host.name as host_name,
-        host.email as host_email,
-        host.profile_image_url as host_profile_image_url,
-        host.locale as host_locale
+        END AS user_role,
+        -- 호스트 정보
+        host.name AS host_name,
+        host.email AS host_email,
+        host.profile_image_url AS host_profile_image_url,
+        host.locale AS host_locale
     FROM tl_meetings m
     LEFT JOIN tl_meeting_participants p 
         ON m.meetings_id = p.meetings_id AND p.user_id = #{userId}
     LEFT JOIN tl_users host 
         ON m.host_id = host.user_id
-    WHERE m.host_id = #{userId}  
-       OR p.user_id = #{userId}   
+    WHERE m.host_id = #{userId}
+       OR p.user_id = #{userId}
     <if test="status != null and status != ''">
         AND m.status = #{status}
     </if>
@@ -155,10 +148,9 @@
     </if>
     ORDER BY m.scheduled_at DESC, m.meetings_id DESC
     LIMIT #{limit} OFFSET #{offset}
-</select>
+  </select>
 
-<!-- 카운트 쿼리 -->
-<select id="countByUserIncludingParticipant" resultType="long">
+  <select id="countByUserIncludingParticipant" resultType="long">
     SELECT COUNT(DISTINCT m.meetings_id)
     FROM tl_meetings m
     LEFT JOIN tl_meeting_participants p 
@@ -174,29 +166,81 @@
     <if test="to != null">
         AND m.scheduled_at &lt;= #{to}
     </if>
-</select>
+  </select>
 
-<select id="selectById" resultType="map">
-  SELECT *
-  FROM ${table}
-  WHERE ${pk} = #{id}
-  LIMIT 1
-</select>
+  <!-- 동적 조회(테이블/PK 지정 버전) -->
+  <select id="selectById" resultType="map">
+    SELECT *
+    FROM ${table}
+    WHERE ${pk} = #{id}
+    LIMIT 1
+  </select>
 
-  <!-- 특정 회의의 모든 참가자 조회 -->
-  <!-- <select id="selectParticipantsByMeetingId" resultType="map">
-    SELECT 
-        p.user_id,
-        p.role,
-        u.name as user_name,
-        u.email as user_email
-    FROM tl_meeting_participants p
-    LEFT JOIN tl_users u ON p.user_id = u.user_id
-    WHERE p.meetings_id = #{meetingsId}
-  </select> -->
+  <!-- ⚠️ 고정 테이블 버전: 메서드/SQL id를 분리 -->
+  <select id="selectByIdFixed" parameterType="long" resultType="map">
+    SELECT *
+    FROM tl_meetings
+    WHERE meetings_id = #{meetingId}
+    LIMIT 1
+  </select>
 
+  <!-- ========================= -->
+  <!-- meeting_mode 관련(고정 테이블) -->
+  <!-- ========================= -->
 
+  <select id="selectMeetingMode" parameterType="long" resultType="string">
+    SELECT meeting_mode
+    FROM tl_meetings
+    WHERE meetings_id = #{meetingId}
+    LIMIT 1
+  </select>
 
+  <update id="updateCultureMeta">
+    UPDATE tl_meetings
+    <set>
+      <if test="cultureDesc != null">         culture_desc = #{cultureDesc},</if>
+      <if test="cultureThumbRelPath != null"> culture_thumb_rel_path = #{cultureThumbRelPath},</if>
+      updated_at = CURRENT_TIMESTAMP
+    </set>
+    WHERE meetings_id = #{meetingId}
+  </update>
 
+  <select id="countByMode" resultType="long">
+    SELECT COUNT(*)
+    FROM tl_meetings
+    WHERE meeting_mode = #{mode}
+    <if test="status != null and status != ''">
+      AND status = #{status}
+    </if>
+    <if test="hostId != null">
+      AND host_id = #{hostId}
+    </if>
+  </select>
 
+  <select id="selectPageByMode" resultType="map">
+    SELECT
+      meetings_id,
+      host_id,
+      title,
+      status,
+      invite_code,
+      default_lang,
+      meeting_mode,
+      scheduled_at,
+      created_at,
+      updated_at,
+      ended_at,
+      culture_desc           AS cultureDesc,
+      culture_thumb_rel_path AS cultureThumbRelPath
+    FROM tl_meetings
+    WHERE meeting_mode = #{mode}
+    <if test="status != null and status != ''">
+      AND status = #{status}
+    </if>
+    <if test="hostId != null">
+      AND host_id = #{hostId}
+    </if>
+    ORDER BY COALESCE(updated_at, created_at) DESC, meetings_id DESC
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
 </mapper>

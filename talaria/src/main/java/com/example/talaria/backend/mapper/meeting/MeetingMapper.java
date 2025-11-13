@@ -75,8 +75,18 @@ public interface MeetingMapper {
                       @Param("hostId") long hostId,
                       @Param("inviteCode") String inviteCode);
 
+    // === 모드별 조회(고정 테이블 사용) ===
+    long countByMode(@Param("mode") String mode,
+                     @Param("status") String status,
+                     @Param("hostId") Long hostId);
 
-  // 사용자가 호스트이거나 참가자인 모든 회의 조회
+    List<Map<String,Object>> selectPageByMode(@Param("mode") String mode,
+                                              @Param("status") String status,
+                                              @Param("hostId") Long hostId,
+                                              @Param("limit") int limit,
+                                              @Param("offset") int offset);
+
+    // 사용자가 호스트이거나 참가자인 모든 회의 조회
     List<Map<String,Object>> selectByUserIncludingParticipant(
         @Param("userId") long userId,
         @Param("status") String status,
@@ -94,9 +104,14 @@ public interface MeetingMapper {
     );
 
     Map<String, Object> selectById(@Param("table") String table,
-                               @Param("pk") String pk,
-                               @Param("id") long id);
+                                   @Param("pk") String pk,
+                                   @Param("id") long id);
 
+    Map<String,Object> selectByIdFixed(@Param("meetingId") long meetingId);
 
+    String selectMeetingMode(@Param("meetingId") long meetingId);
 
+    int updateCultureMeta(@Param("meetingId") long meetingId,
+                          @Param("cultureDesc") String cultureDesc,
+                          @Param("cultureThumbRelPath") String cultureThumbRelPath);
 }

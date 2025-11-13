@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.talaria.backend.mapper.meeting.MeetingTagMapper">
+
+  <!-- 회의 메타 -->
+  <select id="selectMeetingMeta" resultType="map">
+    SELECT meetings_id, host_id, status, meeting_mode
+    FROM tl_meetings
+    WHERE meetings_id = #{meetingId}
+    LIMIT 1
+  </select>
+
+  <!-- 마스터 태그 목록 -->
+  <select id="selectAllMasterTags" resultType="map">
+    SELECT
+      tag_id, tag_name, color_code, is_active, display_order,
+      created_at, updated_at
+    FROM tl_tags
+    <if test="activeOnly">
+      WHERE is_active = 1
+    </if>
+    ORDER BY COALESCE(display_order, 999999), tag_id
+  </select>
+
+  <!-- 특정 회의에 부착된 태그(상세) -->
+  <select id="selectAssignedTags" resultType="map">
+    SELECT
+      m.tag_id,
+      m.meeting_id,
+      m.created_by_user_id,
+      m.created_at,
+      m.updated_at,
+      t.tag_name,
+      t.color_code,
+      t.is_active
+    FROM tl_meetings_tag m
+    JOIN tl_tags t ON t.tag_id = m.tag_id
+    WHERE m.meeting_id = #{meetingId}
+    ORDER BY COALESCE(t.display_order, 999999), t.tag_id
+  </select>
+
+  <!--  마스터 전체 + 회의 부착여부(assigned) 플래그로 한 번에 -->
+  <select id="selectMasterWithAssigned" resultType="map">
+    SELECT
+      t.tag_id,
+      t.tag_name,
+      t.color_code,
+      t.is_active,
+      t.display_order,
+      t.created_at,
+      t.updated_at,
+      CASE WHEN mt.tag_id IS NULL THEN 0 ELSE 1 END AS assigned
+    FROM tl_tags t
+    LEFT JOIN tl_meetings_tag mt
+      ON mt.tag_id = t.tag_id
+     AND mt.meeting_id = #{meetingId}
+    <if test="activeOnly">
+      WHERE t.is_active = 1
+    </if>
+    ORDER BY COALESCE(t.display_order, 999999), t.tag_id
+  </select>
+
+  <!--  회의에 부착된 tag_id만 심플 조회 -->
+  <select id="selectAssignedTagIds" resultType="long">
+    SELECT tag_id
+    FROM tl_meetings_tag
+    WHERE meeting_id = #{meetingId}
+    ORDER BY tag_id
+  </select>
+
+  <!-- 단건 첨부(idempotent) -->
+  <insert id="upsertMapping">
+    INSERT INTO tl_meetings_tag (meeting_id, tag_id, created_by_user_id)
+    VALUES (#{meetingId}, #{tagId}, #{userId})
+    ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
+  </insert>
+
+  <!-- 단건 해제 -->
+  <delete id="deleteMapping">
+    DELETE FROM tl_meetings_tag
+    WHERE meeting_id = #{meetingId}
+      AND tag_id     = #{tagId}
+  </delete>
+
+  <!-- 전달된 tagIds 에 없는 매핑 제거(= 교체용) -->
+  <delete id="deleteMappingsNotIn">
+    DELETE FROM tl_meetings_tag
+    WHERE meeting_id = #{meetingId}
+    <if test="tagIds != null and tagIds.size() > 0">
+      AND tag_id NOT IN
+      <foreach collection="tagIds" item="id" open="(" separator="," close=")">
+        #{id}
+      </foreach>
+    </if>
+  </delete>
+
+  <!-- (옵션) 회의 전체 매핑 제거 -->
+  <delete id="deleteAllByMeeting">
+    DELETE FROM tl_meetings_tag
+    WHERE meeting_id = #{meetingId}
+  </delete>
+
+</mapper>
