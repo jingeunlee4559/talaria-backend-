@@ -231,7 +231,7 @@
     SELECT
       m.meetings_id,
       m.host_id,
-      host.name AS host_name,
+      u.name                      AS host_name,
       m.title,
       m.status,
       m.invite_code,
@@ -241,10 +241,10 @@
       m.created_at,
       m.updated_at,
       m.ended_at,
-      m.culture_desc           AS cultureDesc,
-      m.culture_thumb_rel_path AS cultureThumbRelPath
+      COALESCE(m.culture_desc, '')            AS cultureDesc,
+      COALESCE(m.culture_thumb_rel_path, '')  AS cultureThumbRelPath
     FROM tl_meetings m
-    LEFT JOIN tl_users host ON host.user_id = m.host_id
+    LEFT JOIN tl_users u ON u.user_id = m.host_id
     WHERE m.meeting_mode = #{mode}
     <if test="status != null and status != ''">
       AND m.status = #{status}
