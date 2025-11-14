@@ -28,7 +28,7 @@ public class LivekitService {
     return at.toJwt();
   }
 
-  /** 메타데이터 포함 토큰 발급 — JWT payload의 metadata에 meetings_id 포함 */
+  /** 메타데이터 포함 토큰 발급 — JWT payload의 metadata에 meetings_id, meeting_mode 포함 */
   public String createJoinTokenWithMeta(
       String room,
       String identity,
@@ -37,7 +37,8 @@ public class LivekitService {
       String appLocale,     // 사용자 locale (예: ko-KR)
       String targetLocale,  // 회의 기본 locale (예: ko-KR)
       Long userId,
-      Long meetingsId       // ✅ 추가: JWT metadata에 넣을 meetings_id
+      Long meetingsId,
+      String meetingMode    // 'B' 또는 'C'
   ) {
     AccessToken at = new AccessToken(cfg.getApiKey(), cfg.getApiSecret());
     at.setIdentity(identity);
@@ -52,7 +53,7 @@ public class LivekitService {
         new CanPublishData(true)
     );
 
-    // JWT payload의 "metadata" 클레임(JSON 문자열)에 meetings_id 포함 (snake_case)
+    // JWT payload의 "metadata" 클레임(JSON 문자열)
     String metadataJson = String.format(
         "{" +
           "\"appLocale\":\"%s\"," +
@@ -60,14 +61,16 @@ public class LivekitService {
           "\"username\":\"%s\"," +
           "\"userId\":%s," +
           "\"identity\":\"%s\"," +
-          "\"meetings_id\":%s" +
+          "\"meetings_id\":%s," +
+          "\"meeting_mode\":\"%s\"" +
         "}",
         safe(appLocale),
         safe(targetLocale),
         safe(name),
         (userId == null ? "null" : String.valueOf(userId)),
         safe(identity),
-        (meetingsId == null ? "null" : String.valueOf(meetingsId))
+        (meetingsId == null ? "null" : String.valueOf(meetingsId)),
+        safe(meetingMode)
     );
     at.setMetadata(metadataJson);
 

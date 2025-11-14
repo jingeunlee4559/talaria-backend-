@@ -48,8 +48,18 @@
   </select>
 
   <select id="selectByInviteCode" resultType="map">
-    SELECT meetings_id, host_id, title, status, invite_code,
-           default_lang, scheduled_at, created_at, updated_at, ended_at
+    SELECT
+      meetings_id,
+      host_id,
+      title,
+      status,
+      invite_code,
+      default_lang,
+      meeting_mode,            
+      scheduled_at,
+      created_at,
+      updated_at,
+      ended_at
     FROM ${table}
     WHERE invite_code = #{inviteCode}
     LIMIT 1

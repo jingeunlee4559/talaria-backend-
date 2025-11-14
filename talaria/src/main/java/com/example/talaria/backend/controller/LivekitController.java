@@ -85,6 +85,7 @@ public class LivekitController {
     long ttl = normalizeTtl(req.ttlSec());
     String identity = req.identity();
     String displayName = isBlank(req.name()) ? "Guest" : trim(req.name(), 64);
+
     // 2) 회의 선택/생성
     Map<String,Object> meeting;
     try {
@@ -152,8 +153,19 @@ public class LivekitController {
       ));
     }
 
-    // 3) locale 결정
+    // 3) locale & meeting_mode 결정
     String finalRoom = String.valueOf(meeting.get("invite_code"));
+
+    // meeting_mode (없으면 기본 B)
+    String meetingMode = "B";
+    Object mm = meeting.get("meeting_mode");
+    if (mm != null) {
+      String mms = String.valueOf(mm).trim();
+      if (!mms.isBlank()) {
+        meetingMode = mms.substring(0, 1).toUpperCase(Locale.ROOT);
+      }
+    }
+
     // 사용자 locale (tl_users.locale) 조회 (없으면 ko-KR)
     String userLocale = "ko-KR";
     try {
@@ -171,10 +183,18 @@ public class LivekitController {
     // 회의 기본 언어 → BCP47로 보정
     String targetLocale = toBcp47(String.valueOf(meeting.getOrDefault("default_lang", "ko")));
 
-    // 4) LiveKit 토큰(메타데이터 포함) 발급
+    // 4) LiveKit 토큰(메타데이터 포함) 발급 — meetingMode 추가
     long meetingsId = ((Number) meeting.get("meetings_id")).longValue();
     String jwt = service.createJoinTokenWithMeta(
-    finalRoom, identity, displayName, ttl, userLocale, targetLocale, req.userId(), meetingsId
+        finalRoom,
+        identity,
+        displayName,
+        ttl,
+        userLocale,
+        targetLocale,
+        req.userId(),
+        meetingsId,
+        meetingMode
     );
 
     // 5) 참가자 JOIN 기록(실패 무시)
@@ -191,7 +211,7 @@ public class LivekitController {
       }
     }
 
-    // 6) A안: Map 응답 + meeting_id(snake_case) 포함
+    // 6) 응답
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("wsUrl", cfg.getWsUrl());
     body.put("token", jwt);
@@ -199,6 +219,8 @@ public class LivekitController {
     body.put("identity", identity);
     body.put("ttlSec", ttl);
     body.put("userLocale", userLocale);
+    body.put("meeting_mode", meetingMode);  // ★ 응답에 노출(스네이크)
+    body.put("meetingMode", meetingMode);   // ★ 필요 시 카멜
     body.put("meeting_id", meetingsId);
     body.put("meeting", meeting);
 
