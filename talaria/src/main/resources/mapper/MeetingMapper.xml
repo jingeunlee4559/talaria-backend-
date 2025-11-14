@@ -219,28 +219,30 @@
 
   <select id="selectPageByMode" resultType="map">
     SELECT
-      meetings_id,
-      host_id,
-      title,
-      status,
-      invite_code,
-      default_lang,
-      meeting_mode,
-      scheduled_at,
-      created_at,
-      updated_at,
-      ended_at,
-      culture_desc           AS cultureDesc,
-      culture_thumb_rel_path AS cultureThumbRelPath
-    FROM tl_meetings
-    WHERE meeting_mode = #{mode}
+      m.meetings_id,
+      m.host_id,
+      host.name AS host_name,
+      m.title,
+      m.status,
+      m.invite_code,
+      m.default_lang,
+      m.meeting_mode,
+      m.scheduled_at,
+      m.created_at,
+      m.updated_at,
+      m.ended_at,
+      m.culture_desc           AS cultureDesc,
+      m.culture_thumb_rel_path AS cultureThumbRelPath
+    FROM tl_meetings m
+    LEFT JOIN tl_users host ON host.user_id = m.host_id
+    WHERE m.meeting_mode = #{mode}
     <if test="status != null and status != ''">
-      AND status = #{status}
+      AND m.status = #{status}
     </if>
     <if test="hostId != null">
-      AND host_id = #{hostId}
+      AND m.host_id = #{hostId}
     </if>
-    ORDER BY COALESCE(updated_at, created_at) DESC, meetings_id DESC
+    ORDER BY COALESCE(m.updated_at, m.created_at) DESC, m.meetings_id DESC
     LIMIT #{limit} OFFSET #{offset}
   </select>
 </mapper>

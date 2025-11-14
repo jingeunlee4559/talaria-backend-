@@ -199,8 +199,8 @@ public class LivekitController {
     body.put("identity", identity);
     body.put("ttlSec", ttl);
     body.put("userLocale", userLocale);
-    body.put("meeting_id", meetingsId); // ← snake_case 추가
-    body.put("meeting", meeting);       // (호환 유지를 원하면 포함)
+    body.put("meeting_id", meetingsId);
+    body.put("meeting", meeting);
 
     return ResponseEntity.ok(body);
   }
