@@ -13,10 +13,7 @@ import com.example.talaria.backend.event.MeetingEvents.MeetingUpdatedEvent;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -62,7 +59,10 @@ public class MeetingService {
         return mapper.selectRecentActiveByHostAndTitle(TABLE, hostId, title, since);
     }
 
-    // 생성 진입점 — status/meetingMode/썸네일 반영
+    /* =========================
+       생성부 (오버로드 1) — 기존 진입점
+       status/meetingMode/썸네일 반영
+       ========================= */
     @Transactional
     public Map<String,Object> create(long hostId,
                                      String title,
@@ -73,17 +73,38 @@ public class MeetingService {
                                      String requestedStatus) {     // 'SCHEDULED'/'ONGOING'/'ENDED'
         if (scheduledAt == null) scheduledAt = LocalDateTime.now();
         String normStatus = normalizeStatus(requestedStatus);
-        return createNew(hostId, title, defaultLang, scheduledAt, meetingMode, cultureThumbRelPath, normStatus);
+        return createNew(hostId, title, defaultLang, scheduledAt, meetingMode, cultureThumbRelPath, null, normStatus);
+    }
+
+    /* =========================
+       생성부 (오버로드 2) — cultureDesc 추가
+       컨트롤러에서 cultureDesc까지 받는 경우 이 메서드를 호출
+       ========================= */
+    @Transactional
+    public Map<String,Object> create(long hostId,
+                                     String title,
+                                     String defaultLang,
+                                     LocalDateTime scheduledAt,
+                                     String meetingMode,           // 'B'/'C'
+                                     String cultureThumbRelPath,   // nullable
+                                     String requestedStatus,       // 'SCHEDULED'/'ONGOING'/'ENDED'
+                                     String cultureDesc            // nullable
+    ) {
+        if (scheduledAt == null) scheduledAt = LocalDateTime.now();
+        String normStatus = normalizeStatus(requestedStatus);
+        return createNew(hostId, title, defaultLang, scheduledAt, meetingMode, cultureThumbRelPath, cultureDesc, normStatus);
     }
 
     // 기존 호환 (status 미지정 → SCHEDULED)
     @Transactional
     public Map<String,Object> create(long hostId, String title, String defaultLang, LocalDateTime scheduledAt) {
         if (scheduledAt == null) scheduledAt = LocalDateTime.now();
-        return createNew(hostId, title, defaultLang, scheduledAt, "B", null, DEFAULT_STATUS);
+        return createNew(hostId, title, defaultLang, scheduledAt, "B", null, null, DEFAULT_STATUS);
     }
 
-    // 실제 생성 — status/meetingMode/썸네일 적용
+    /* =========================
+       실제 생성 — meeting_mode / culture_thumb_rel_path / culture_desc / status 적용
+       ========================= */
     @Transactional
     public Map<String,Object> createNew(long hostId,
                                         String title,
@@ -91,21 +112,24 @@ public class MeetingService {
                                         LocalDateTime scheduledAt,
                                         String meetingMode,
                                         String cultureThumbRelPath,
+                                        String cultureDesc,         // ★ 신규
                                         String status) {
         String mode  = (meetingMode != null && meetingMode.equalsIgnoreCase("C")) ? "C" : "B";
         String thumb = (cultureThumbRelPath == null || cultureThumbRelPath.isBlank()) ? null : cultureThumbRelPath.trim();
+        if (thumb != null && !thumb.startsWith("/")) thumb = "/" + thumb; // URL 일관성: 항상 "/img/..."
         String normStatus = normalizeStatus(status);
 
         String invite = generateInviteCode(10);
         for (int i = 0; i < 10; i++) {
             try {
-                // insert(table, hostId, title, status, invite, defaultLang, scheduledAt, meetingMode, cultureThumbRelPath)
-                mapper.insert(TABLE, hostId, title, normStatus, invite, defaultLang, scheduledAt, mode, thumb);
+                // INSERT: (table, hostId, title, status, invite, defaultLang, scheduledAt, meetingMode, cultureThumbRelPath, cultureDesc)
+                mapper.insert(TABLE, hostId, title, normStatus, invite, defaultLang, scheduledAt, mode, thumb, cultureDesc);
                 long id = mapper.lastInsertId();
                 Map<String,Object> created = getOneByHost(hostId, id);
                 events.publishEvent(new MeetingCreatedEvent(id));
                 return created;
             } catch (DataIntegrityViolationException dup) {
+                // invite_code UNIQUE 충돌 시 재시도
                 invite = generateInviteCode(10);
             }
         }
@@ -115,7 +139,7 @@ public class MeetingService {
     // 이전 호환 (B 모드, SCHEDULED)
     @Transactional
     public Map<String,Object> createNew(long hostId, String title, String defaultLang, LocalDateTime scheduledAt) {
-        return createNew(hostId, title, defaultLang, scheduledAt, "B", null, DEFAULT_STATUS);
+        return createNew(hostId, title, defaultLang, scheduledAt, "B", null, null, DEFAULT_STATUS);
     }
 
     // 부분 수정
@@ -228,11 +252,16 @@ public class MeetingService {
         if (obj instanceof Number) return ((Number) obj).longValue();
         return null;
     }
-   @Transactional
-public int updateThumb(long hostId, long meetingsId, String relPath) {
-    if (relPath == null || relPath.isBlank()) return 0;
-    int n = mapper.updateThumb("tl_meetings", "meetings_id", meetingsId, hostId, relPath.trim());
-    if (n > 0) events.publishEvent(new MeetingUpdatedEvent(meetingsId));
-    return n;
-}
+
+    /* =========================
+       썸네일 단독 업데이트 (/api/assets/.../thumb)
+       ========================= */
+    @Transactional
+    public int updateThumb(long hostId, long meetingsId, String relPath) {
+        if (relPath == null || relPath.isBlank()) return 0;
+        String store = relPath.startsWith("/") ? relPath : ("/" + relPath); // 항상 "/img/..."로 저장
+        int n = mapper.updateThumb(TABLE, PK, meetingsId, hostId, store);
+        if (n > 0) events.publishEvent(new MeetingUpdatedEvent(meetingsId));
+        return n;
+    }
 }

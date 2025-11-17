@@ -45,7 +45,8 @@ public interface MeetingMapper {
                @Param("defaultLang") String defaultLang,
                @Param("scheduledAt") LocalDateTime scheduledAt,
                @Param("meetingMode") String meetingMode,                 
-               @Param("cultureThumbRelPath") String cultureThumbRelPath);
+               @Param("cultureThumbRelPath") String cultureThumbRelPath,
+               @Param("cultureDesc") String cultureDesc);
 
     long lastInsertId();
 

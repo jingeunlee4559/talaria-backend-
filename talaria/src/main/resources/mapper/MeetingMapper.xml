@@ -90,9 +90,9 @@
   <!-- ===== 생성 ===== -->
   <insert id="insert">
     INSERT INTO tl_meetings
-      (host_id, title, status, invite_code, default_lang, scheduled_at, meeting_mode, culture_thumb_rel_path)
+      (host_id, title, status, invite_code, default_lang, scheduled_at, meeting_mode, culture_thumb_rel_path, culture_desc)
     VALUES
-      (#{hostId}, #{title}, #{status}, #{inviteCode}, #{defaultLang}, #{scheduledAt}, #{meetingMode}, #{cultureThumbRelPath})
+      (#{hostId}, #{title}, #{status}, #{inviteCode}, #{defaultLang}, #{scheduledAt}, #{meetingMode}, #{cultureThumbRelPath}, #{cultureDesc})
   </insert>
 
   <select id="lastInsertId" resultType="long">

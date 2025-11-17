@@ -1,6 +1,7 @@
 package com.example.talaria.backend.controller;
 
 import com.example.talaria.backend.dto.common.PageResponse;
+import com.example.talaria.backend.service.asset.FrontAssetStorage;
 import com.example.talaria.backend.service.meeting.MeetingService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -9,9 +10,11 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URI;
 import java.time.LocalDateTime;
@@ -23,6 +26,7 @@ import java.util.Map;
 public class MeetingController {
 
     private final MeetingService service;
+    private final FrontAssetStorage frontAssetStorage; // 프론트 퍼블릭 디렉터리 저장
 
     // 목록 조회
     @GetMapping
@@ -54,9 +58,9 @@ public class MeetingController {
         return row == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(row);
     }
 
-    // 생성 (scheduledAt null → now() 보정) — status/meetingMode/썸네일 반영
-    @PostMapping
-    public ResponseEntity<?> create(
+    // (1) JSON 바디로 생성 (파일 업로드 없음)
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> createJson(
             @PathVariable("userId") long userId,
             @RequestBody @Valid CreateMeetingReq req) {
         try {
@@ -65,9 +69,10 @@ public class MeetingController {
                     req.getTitle(),
                     req.getDefaultLang(),
                     req.getScheduledAt(),
-                    normalizeMode(req.getMeetingMode()),                 // 'B' or 'C'
-                    emptyToNull(req.getCultureThumbRelPath()),          // nullable
-                    normalizeStatus(req.getStatus())                    // 'SCHEDULED'/'ONGOING'/'ENDED'
+                    normalizeMode(req.getMeetingMode()),                // 'B' or 'C'
+                    emptyToNull(req.getCultureThumbRelPath()),         // 파일 없이 경로만 전달 가능
+                    normalizeStatus(req.getStatus()),
+                    emptyToNull(req.getCultureDesc())                  // ★ culture_desc
             );
             return ResponseEntity.ok(created);
         } catch (IllegalStateException e) {
@@ -85,7 +90,51 @@ public class MeetingController {
         }
     }
 
-    // 부분 수정(제목/언어/시간/상태 등)
+    // (2) multipart/form-data로 생성 (파일 업로드 포함)
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> createWithThumb(
+            @PathVariable("userId") long userId,
+            @Valid @ModelAttribute CreateMeetingReq req,                       // 텍스트 파트들
+            @RequestPart(name = "cultureThumb", required = false) MultipartFile cultureThumb // 파일 파트
+    ) {
+        try {
+            // 파일 저장 (null/빈파일이면 null 리턴)
+            String savedRel = frontAssetStorage.saveCultureThumb(cultureThumb);
+
+            var created = service.create(
+                    userId,
+                    req.getTitle(),
+                    req.getDefaultLang(),
+                    req.getScheduledAt(),
+                    normalizeMode(req.getMeetingMode()),
+                    // 파일이 올라오면 저장된 경로 사용, 아니면 사용자가 form-data로 준 경로 사용
+                    (savedRel != null ? savedRel : emptyToNull(req.getCultureThumbRelPath())),
+                    normalizeStatus(req.getStatus()),
+                    emptyToNull(req.getCultureDesc())                 // ★ culture_desc
+            );
+            return ResponseEntity.ok(created);
+        } catch (IllegalStateException e) {
+            var pd = ProblemDetail.forStatus(409);
+            pd.setTitle("Conflict");
+            pd.setDetail(e.getMessage());
+            pd.setInstance(URI.create("/api/users/" + userId + "/meetings"));
+            return ResponseEntity.status(409).body(Map.of(
+                    "type","about:blank","title",pd.getTitle(),"status",409,
+                    "detail",pd.getDetail(),"instance",pd.getInstance().toString()
+            ));
+        } catch (Exception ex) {
+            var pd = ProblemDetail.forStatus(500);
+            pd.setTitle("Server Error");
+            pd.setDetail("Upload failed: " + ex.getMessage());
+            pd.setInstance(URI.create("/api/users/" + userId + "/meetings"));
+            return ResponseEntity.status(500).body(Map.of(
+                    "type","about:blank","title",pd.getTitle(),"status",500,
+                    "detail",pd.getDetail(),"instance",pd.getInstance().toString()
+            ));
+        }
+    }
+
+    // 부분 수정(제목/언어/시간/상태 등) — 필요 시 cultureDesc도 PATCH에 포함 가능
     @PatchMapping("/{id}")
     public ResponseEntity<Map<String,Object>> patch(
             @PathVariable("userId") long userId,
@@ -136,36 +185,31 @@ public class MeetingController {
             service.listByUserIncludingParticipant(userId, status, from, to, page, size)
         );
     }
-    @PatchMapping("/{id}/thumb")
-    public ResponseEntity<?> setThumb(
-            @PathVariable("userId") long userId,
-            @PathVariable("id") long id,
-            @RequestBody ThumbReq req
-    ) {
-        int n = service.updateThumb(userId, id, req.getRelPath());
-        return ResponseEntity.ok(Map.of("updated", n, "cultureThumbRelPath", req.getRelPath()));
-    }
-
 
     // ===== DTO =====
     @Data
     public static class CreateMeetingReq {
         @NotBlank @Size(max = 200)
         private String title;
+
         @Size(max = 10)
         private String defaultLang = "ko";
+
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
         private LocalDateTime scheduledAt; // null 허용
 
-        // 생성 시 status 입력 가능 (null/유효X → SCHEDULED)
         @Pattern(regexp = "^(SCHEDULED|ONGOING|ENDED)$",
                  message = "status must be SCHEDULED, ONGOING, or ENDED")
         private String status;
 
         @Pattern(regexp = "^[BC]$", message = "meetingMode must be 'B' or 'C'")
-        private String meetingMode;                // null 가능 → 기본 B
+        private String meetingMode;                // null → 기본 B
+
         @Size(max = 512)
-        private String cultureThumbRelPath;        // null 가능
+        private String cultureThumbRelPath;        // 파일 없이 경로만 줄 때 사용
+
+        @Size(max = 500)
+        private String cultureDesc;                // ★ culture_desc
     }
 
     @Data
@@ -181,13 +225,9 @@ public class MeetingController {
         private LocalDateTime scheduledAt;
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
         private LocalDateTime endedAt;
+        // 필요 시 cultureDesc도 PATCH에 포함하고 mapper.updatePartial에 반영 가능
+        // private String cultureDesc;
     }
-    @lombok.Data
-    public static class ThumbReq {
-        @jakarta.validation.constraints.NotBlank
-        private String relPath; // 예: "img/1731821_xxx.png"
-    }
-
 
     // ===== helpers =====
     private static String normalizeMode(String m) {
