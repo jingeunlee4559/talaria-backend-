@@ -4,8 +4,7 @@
   "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.talaria.backend.mapper.meeting.MeetingMapper">
 
-  <!-- 기존: host 기준 동적 테이블 쿼리들은 유지 (서비스에서 table/pk 상수 넘김) -->
-
+  <!-- ===== 호스트 기준: 카운트/목록 ===== -->
   <select id="countByHost" resultType="long">
     SELECT COUNT(*)
     FROM tl_meetings
@@ -22,8 +21,13 @@
   </select>
 
   <select id="selectPageByHost" resultType="map">
-    SELECT meetings_id, host_id, title, status, invite_code,
-           default_lang, scheduled_at, created_at, updated_at, ended_at
+    SELECT
+      meetings_id, host_id, title, status, invite_code,
+      default_lang, meeting_mode, scheduled_at, created_at, updated_at, ended_at,
+      COALESCE(culture_desc, '')            AS culture_desc,
+      COALESCE(culture_desc, '')            AS cultureDesc,
+      COALESCE(culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
+      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath
     FROM tl_meetings
     WHERE host_id = #{hostId}
     <if test="status != null and status != ''">
@@ -40,8 +44,13 @@
   </select>
 
   <select id="selectOneByHost" resultType="map">
-    SELECT meetings_id, host_id, title, status, invite_code,
-           default_lang, scheduled_at, created_at, updated_at, ended_at
+    SELECT
+      meetings_id, host_id, title, status, invite_code,
+      default_lang, meeting_mode, scheduled_at, created_at, updated_at, ended_at,
+      COALESCE(culture_desc, '')            AS culture_desc,
+      COALESCE(culture_desc, '')            AS cultureDesc,
+      COALESCE(culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
+      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath
     FROM tl_meetings
     WHERE ${pk} = #{id}
       AND host_id = #{hostId}
@@ -49,25 +58,26 @@
 
   <select id="selectByInviteCode" resultType="map">
     SELECT
-      meetings_id,
-      host_id,
-      title,
-      status,
-      invite_code,
-      default_lang,
-      meeting_mode,            
-      scheduled_at,
-      created_at,
-      updated_at,
-      ended_at
+      meetings_id, host_id, title, status, invite_code,
+      default_lang, meeting_mode,
+      scheduled_at, created_at, updated_at, ended_at,
+      COALESCE(culture_desc, '')            AS culture_desc,
+      COALESCE(culture_desc, '')            AS cultureDesc,
+      COALESCE(culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
+      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath
     FROM tl_meetings
     WHERE invite_code = #{inviteCode}
     LIMIT 1
   </select>
 
   <select id="selectRecentActiveByHostAndTitle" resultType="map">
-    SELECT meetings_id, host_id, title, status, invite_code,
-           default_lang, scheduled_at, created_at, updated_at, ended_at
+    SELECT
+      meetings_id, host_id, title, status, invite_code,
+      default_lang, meeting_mode, scheduled_at, created_at, updated_at, ended_at,
+      COALESCE(culture_desc, '')            AS culture_desc,
+      COALESCE(culture_desc, '')            AS cultureDesc,
+      COALESCE(culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
+      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath
     FROM tl_meetings
     WHERE host_id = #{hostId}
       AND title = #{title}
@@ -77,6 +87,7 @@
     LIMIT 1
   </select>
 
+  <!-- ===== 생성 ===== -->
   <insert id="insert">
     INSERT INTO tl_meetings
       (host_id, title, status, invite_code, default_lang, scheduled_at, meeting_mode, culture_thumb_rel_path)
@@ -88,6 +99,7 @@
     SELECT LAST_INSERT_ID()
   </select>
 
+  <!-- ===== 부분 업데이트/상태 변경 ===== -->
   <update id="updatePartial">
     UPDATE tl_meetings
     <set>
@@ -97,64 +109,70 @@
       <if test="defaultLang != null">  default_lang = #{defaultLang},</if>
       <if test="scheduledAt != null">  scheduled_at = #{scheduledAt},</if>
       <if test="endedAt != null">      ended_at = #{endedAt},</if>
+      updated_at = CURRENT_TIMESTAMP
     </set>
     WHERE ${pk} = #{id} AND host_id = #{hostId}
   </update>
 
   <update id="markOngoing">
     UPDATE tl_meetings
-    SET status = 'ONGOING'
+    SET status = 'ONGOING',
+        updated_at = CURRENT_TIMESTAMP
     WHERE ${pk} = #{id} AND host_id = #{hostId}
   </update>
 
   <update id="markEnded">
     UPDATE tl_meetings
-    SET status = 'ENDED', ended_at = #{endedAt}
+    SET status = 'ENDED',
+        ended_at = #{endedAt},
+        updated_at = CURRENT_TIMESTAMP
     WHERE ${pk} = #{id} AND host_id = #{hostId}
   </update>
 
   <update id="setInviteCode">
     UPDATE tl_meetings
-    SET invite_code = #{inviteCode}
+    SET invite_code = #{inviteCode},
+        updated_at = CURRENT_TIMESTAMP
     WHERE ${pk} = #{id} AND host_id = #{hostId}
   </update>
 
-  <!-- 사용자 기준 조회 -->
+  <!-- ===== 사용자 기준 목록 ===== -->
   <select id="selectByUserIncludingParticipant" resultType="map">
     SELECT DISTINCT
-        m.meetings_id,
-        m.host_id,
-        m.title,
-        m.status,
-        m.invite_code,
-        m.default_lang,
-        m.scheduled_at,
-        m.ended_at,
-        m.created_at,
-        CASE 
-            WHEN m.host_id = #{userId} THEN 'HOST'
-            ELSE COALESCE(p.role, 'GUEST')
-        END AS user_role,
-        -- 호스트 정보
-        host.name AS host_name,
-        host.email AS host_email,
-        host.profile_image_url AS host_profile_image_url,
-        host.locale AS host_locale
+      m.meetings_id,
+      m.host_id,
+      m.title,
+      m.status,
+      m.invite_code,
+      m.default_lang,
+      m.meeting_mode,
+      m.scheduled_at,
+      m.ended_at,
+      m.created_at,
+      CASE WHEN m.host_id = #{userId} THEN 'HOST' ELSE COALESCE(p.role, 'GUEST') END AS user_role,
+      u.name  AS host_name,
+      u.email AS host_email,
+      u.profile_image_url AS host_profile_image_url,
+      u.locale AS host_locale,
+      COALESCE(m.culture_desc, '')            AS culture_desc,
+      COALESCE(m.culture_desc, '')            AS cultureDesc,
+      COALESCE(m.culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
+      COALESCE(m.culture_thumb_rel_path, '')  AS cultureThumbRelPath
     FROM tl_meetings m
-    LEFT JOIN tl_meeting_participants p 
-        ON m.meetings_id = p.meetings_id AND p.user_id = #{userId}
-    LEFT JOIN tl_users host 
-        ON m.host_id = host.user_id
+    LEFT JOIN tl_meeting_participants p
+      ON m.meetings_id = p.meetings_id AND p.user_id = #{userId}
+    LEFT JOIN tl_users u
+      ON u.user_id = m.host_id
     WHERE m.host_id = #{userId}
        OR p.user_id = #{userId}
     <if test="status != null and status != ''">
-        AND m.status = #{status}
+      AND m.status = #{status}
     </if>
     <if test="from != null">
-        AND m.scheduled_at &gt;= #{from}
+      AND m.scheduled_at &gt;= #{from}
     </if>
     <if test="to != null">
-        AND m.scheduled_at &lt;= #{to}
+      AND m.scheduled_at &lt;= #{to}
     </if>
     ORDER BY m.scheduled_at DESC, m.meetings_id DESC
     LIMIT #{limit} OFFSET #{offset}
@@ -163,41 +181,49 @@
   <select id="countByUserIncludingParticipant" resultType="long">
     SELECT COUNT(DISTINCT m.meetings_id)
     FROM tl_meetings m
-    LEFT JOIN tl_meeting_participants p 
-        ON m.meetings_id = p.meetings_id AND p.user_id = #{userId}
+    LEFT JOIN tl_meeting_participants p
+      ON m.meetings_id = p.meetings_id AND p.user_id = #{userId}
     WHERE m.host_id = #{userId}
        OR p.user_id = #{userId}
     <if test="status != null and status != ''">
-        AND m.status = #{status}
+      AND m.status = #{status}
     </if>
     <if test="from != null">
-        AND m.scheduled_at &gt;= #{from}
+      AND m.scheduled_at &gt;= #{from}
     </if>
     <if test="to != null">
-        AND m.scheduled_at &lt;= #{to}
+      AND m.scheduled_at &lt;= #{to}
     </if>
   </select>
 
-  <!-- 동적 조회(테이블/PK 지정 버전) -->
+  <!-- ===== 단건 조회 ===== -->
   <select id="selectById" resultType="map">
-    SELECT *
+    SELECT
+      meetings_id, host_id, title, status, invite_code,
+      default_lang, meeting_mode, scheduled_at, created_at, updated_at, ended_at,
+      COALESCE(culture_desc, '')            AS culture_desc,
+      COALESCE(culture_desc, '')            AS cultureDesc,
+      COALESCE(culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
+      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath
     FROM tl_meetings
     WHERE ${pk} = #{id}
     LIMIT 1
   </select>
 
-  <!-- ⚠️ 고정 테이블 버전: 메서드/SQL id를 분리 -->
   <select id="selectByIdFixed" parameterType="long" resultType="map">
-    SELECT *
+    SELECT
+      meetings_id, host_id, title, status, invite_code,
+      default_lang, meeting_mode, scheduled_at, created_at, updated_at, ended_at,
+      COALESCE(culture_desc, '')            AS culture_desc,
+      COALESCE(culture_desc, '')            AS cultureDesc,
+      COALESCE(culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
+      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath
     FROM tl_meetings
     WHERE meetings_id = #{meetingId}
     LIMIT 1
   </select>
 
-  <!-- ========================= -->
-  <!-- meeting_mode 관련(고정 테이블) -->
-  <!-- ========================= -->
-
+  <!-- ===== meeting_mode / culture 메타 ===== -->
   <select id="selectMeetingMode" parameterType="long" resultType="string">
     SELECT meeting_mode
     FROM tl_meetings
@@ -215,6 +241,7 @@
     WHERE meetings_id = #{meetingId}
   </update>
 
+  <!-- ===== 모드별 목록 ===== -->
   <select id="countByMode" resultType="long">
     SELECT COUNT(*)
     FROM tl_meetings
@@ -231,7 +258,7 @@
     SELECT
       m.meetings_id,
       m.host_id,
-      u.name                      AS host_name,
+      u.name AS host_name,
       m.title,
       m.status,
       m.invite_code,
@@ -241,7 +268,9 @@
       m.created_at,
       m.updated_at,
       m.ended_at,
+      COALESCE(m.culture_desc, '')            AS culture_desc,
       COALESCE(m.culture_desc, '')            AS cultureDesc,
+      COALESCE(m.culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
       COALESCE(m.culture_thumb_rel_path, '')  AS cultureThumbRelPath
     FROM tl_meetings m
     LEFT JOIN tl_users u ON u.user_id = m.host_id
@@ -255,6 +284,7 @@
     ORDER BY COALESCE(m.updated_at, m.created_at) DESC, m.meetings_id DESC
     LIMIT #{limit} OFFSET #{offset}
   </select>
+
   <update id="updateThumb">
     UPDATE ${table}
     SET culture_thumb_rel_path = #{cultureThumbRelPath},
@@ -262,4 +292,5 @@
     WHERE ${pk} = #{id}
       AND host_id = #{hostId}
   </update>
+
 </mapper>
