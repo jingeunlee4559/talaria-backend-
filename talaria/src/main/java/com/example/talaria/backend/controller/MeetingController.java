@@ -4,6 +4,7 @@ import com.example.talaria.backend.dto.common.PageResponse;
 import com.example.talaria.backend.service.meeting.MeetingService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -53,14 +54,20 @@ public class MeetingController {
         return row == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(row);
     }
 
-    // 생성 (scheduledAt이 null이면 now()로 보정)
+    // 생성 (scheduledAt이 null이면 now()로 보정)  — C모드 & 썸네일 반영
     @PostMapping
     public ResponseEntity<?> create(
             @PathVariable("userId") long userId,
             @RequestBody @Valid CreateMeetingReq req) {
         try {
-            var created = service.create(userId, req.getTitle(),
-                    req.getDefaultLang(), req.getScheduledAt());
+            var created = service.create(
+                    userId,
+                    req.getTitle(),
+                    req.getDefaultLang(),
+                    req.getScheduledAt(),
+                    normalizeMode(req.getMeetingMode()),              // 'B' or 'C'
+                    emptyToNull(req.getCultureThumbRelPath())        // null 허용
+            );
             return ResponseEntity.ok(created);
         } catch (IllegalStateException e) {
             var pd = ProblemDetail.forStatus(409);
@@ -113,6 +120,22 @@ public class MeetingController {
         return ResponseEntity.ok(Map.of("updated", n));
     }
 
+    // 내가 호스트이거나 참가자인 모든 회의 조회
+    @GetMapping("/all")
+    public ResponseEntity<PageResponse> listAll(
+        @PathVariable("userId") long userId,
+        @RequestParam(name = "status", required = false) String status,
+        @RequestParam(name = "from", required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+        @RequestParam(name = "to", required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+        @RequestParam(name = "page", defaultValue = "0")  int page,
+        @RequestParam(name = "size", defaultValue = "20") int size) {
+        return ResponseEntity.ok(
+            service.listByUserIncludingParticipant(userId, status, from, to, page, size)
+        );
+    }
+
     // ===== DTO =====
     @Data
     public static class CreateMeetingReq {
@@ -121,7 +144,12 @@ public class MeetingController {
         @Size(max = 10)
         private String defaultLang = "ko";
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-        private LocalDateTime scheduledAt; // null 허용, 서버에서 now() 보정
+        private LocalDateTime scheduledAt;
+
+        @Pattern(regexp = "^[BC]$", message = "meetingMode must be 'B' or 'C'")
+        private String meetingMode;
+        @Size(max = 512)
+        private String cultureThumbRelPath;
     }
 
     @Data
@@ -139,19 +167,13 @@ public class MeetingController {
         private LocalDateTime endedAt;
     }
 
-// 내가 호스트이거나 참가자인 모든 회의 조회
-    @GetMapping("/all")
-    public ResponseEntity<PageResponse> listAll(
-        @PathVariable("userId") long userId,
-        @RequestParam(name = "status", required = false) String status,
-        @RequestParam(name = "from", required = false)
-        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
-        @RequestParam(name = "to", required = false)
-        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
-        @RequestParam(name = "page", defaultValue = "0")  int page,
-        @RequestParam(name = "size", defaultValue = "20") int size) {
-    return ResponseEntity.ok(
-        service.listByUserIncludingParticipant(userId, status, from, to, page, size)
-    );
-}
+    // ===== helpers =====
+    private static String normalizeMode(String m) {
+        if (m == null) return "B";
+        String u = m.trim().toUpperCase();
+        return (u.equals("C")) ? "C" : "B";
+    }
+    private static String emptyToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
+    }
 }

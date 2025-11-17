@@ -62,24 +62,43 @@ public class MeetingService {
         return mapper.selectRecentActiveByHostAndTitle(TABLE, hostId, title, since);
     }
 
-    // (Controller에서 쓰는 기본 생성 진입점) null scheduledAt 보정
+    // (Controller에서 쓰는 기본 생성 진입점) null scheduledAt 보정 + 모드/썸네일 반영
+    @Transactional
+    public Map<String,Object> create(long hostId,
+                                     String title,
+                                     String defaultLang,
+                                     LocalDateTime scheduledAt,
+                                     String meetingMode,                 // 'B' or 'C'
+                                     String cultureThumbRelPath) {
+        if (scheduledAt == null) scheduledAt = LocalDateTime.now();
+        return createNew(hostId, title, defaultLang, scheduledAt, meetingMode, cultureThumbRelPath);
+    }
+
     @Transactional
     public Map<String,Object> create(long hostId, String title, String defaultLang, LocalDateTime scheduledAt) {
         if (scheduledAt == null) scheduledAt = LocalDateTime.now();
-        return createNew(hostId, title, defaultLang, scheduledAt);
+        return createNew(hostId, title, defaultLang, scheduledAt, "B", null);
     }
 
-    // 새 회의 생성(백엔드 invite_code 생성 + UNIQUE 충돌 시 재시도)
     @Transactional
-    public Map<String,Object> createNew(long hostId, String title, String defaultLang, LocalDateTime scheduledAt) {
-        if (scheduledAt == null) scheduledAt = LocalDateTime.now();
+    public Map<String,Object> createNew(long hostId,
+                                        String title,
+                                        String defaultLang,
+                                        LocalDateTime scheduledAt,
+                                        String meetingMode,                 // 'B' or 'C'
+                                        String cultureThumbRelPath) {
+
+        String mode = (meetingMode != null && meetingMode.equalsIgnoreCase("C")) ? "C" : "B";
+        String thumb = (cultureThumbRelPath == null || cultureThumbRelPath.isBlank()) ? null : cultureThumbRelPath.trim();
+
         String invite = generateInviteCode(10);
         for (int i = 0; i < 10; i++) {
             try {
-                mapper.insert(TABLE, hostId, title, DEFAULT_STATUS, invite, defaultLang, scheduledAt);
+                // ★ mapper.insert 시그니처가 확장되어 있어야 함 (meetingMode, cultureThumbRelPath 포함)
+                mapper.insert(TABLE, hostId, title, DEFAULT_STATUS, invite, defaultLang, scheduledAt, mode, thumb);
                 long id = mapper.lastInsertId();
                 Map<String,Object> created = getOneByHost(hostId, id);
-                // ★ AFTER_COMMIT 리스너가 동작하도록 이벤트 발행
+                // AFTER_COMMIT 리스너 동작하도록 이벤트 발행
                 events.publishEvent(new MeetingCreatedEvent(id));
                 return created;
             } catch (DataIntegrityViolationException dup) {
@@ -89,13 +108,17 @@ public class MeetingService {
         throw new IllegalStateException("Failed to generate unique invite_code");
     }
 
+    @Transactional
+    public Map<String,Object> createNew(long hostId, String title, String defaultLang, LocalDateTime scheduledAt) {
+        return createNew(hostId, title, defaultLang, scheduledAt, "B", null);
+    }
+
     // 부분 수정
     @Transactional
     public int updatePartial(long hostId, long id, String title, String status,
                              String inviteCode, String defaultLang,
                              LocalDateTime scheduledAt, LocalDateTime endedAt) {
         int updated = mapper.updatePartial(TABLE, PK, id, hostId, title, status, inviteCode, defaultLang, scheduledAt, endedAt);
-        // ★ 회의 시간/제목/상태 변경 시 캘린더 동기화를 위해 이벤트 발행
         if (updated > 0) {
             events.publishEvent(new MeetingUpdatedEvent(id));
         }
@@ -106,7 +129,6 @@ public class MeetingService {
     @Transactional
     public int start(long hostId, long id) {
         int updated = mapper.markOngoing(TABLE, PK, id, hostId);
-        // 상태 변경도 업데이트 이벤트로 통지
         if (updated > 0) {
             events.publishEvent(new MeetingUpdatedEvent(id));
         }
@@ -116,7 +138,6 @@ public class MeetingService {
     @Transactional
     public int end(long hostId, long id) {
         int updated = mapper.markEnded(TABLE, PK, id, hostId, LocalDateTime.now());
-        // 종료 시에도 업데이트 이벤트로 통지(필요 시 캘린더 정책 반영)
         if (updated > 0) {
             events.publishEvent(new MeetingUpdatedEvent(id));
         }
@@ -157,27 +178,22 @@ public class MeetingService {
             userId, status, from, to, size, offset
         );
 
-        // 각 회의에 대해 참가자 정보 및 호스트 정보 정리
         for (Map<String, Object> meeting : items) {
             Long meetingId = toLong(meeting.get("meetings_id"));
 
-            // 호스트 정보를 별도 객체로 구조화
             Map<String, Object> host = new HashMap<>();
             host.put("user_id", meeting.get("host_id"));
             host.put("name", meeting.get("host_name"));
             host.put("email", meeting.get("host_email"));
             host.put("profile_image_url", meeting.get("host_profile_image_url"));
             host.put("locale", meeting.get("host_locale"));
-
             meeting.put("host", host);
 
-            // 원본 host 필드 제거 (선택사항)
             meeting.remove("host_name");
             meeting.remove("host_email");
             meeting.remove("host_profile_image_url");
             meeting.remove("host_locale");
 
-            // 참가자 정보 추가
             if (meetingId != null) {
                 List<Map<String, Object>> participants =
                     participantService.getParticipantsWithUserInfo(meetingId);

@@ -79,9 +79,9 @@
 
   <insert id="insert">
     INSERT INTO ${table}
-      (host_id, title, status, invite_code, default_lang, scheduled_at)
+      (host_id, title, status, invite_code, default_lang, scheduled_at, meeting_mode, culture_thumb_rel_path)
     VALUES
-      (#{hostId}, #{title}, #{status}, #{inviteCode}, #{defaultLang}, #{scheduledAt})
+      (#{hostId}, #{title}, #{status}, #{inviteCode}, #{defaultLang}, #{scheduledAt}, #{meetingMode}, #{cultureThumbRelPath})
   </insert>
 
   <select id="lastInsertId" resultType="long">
