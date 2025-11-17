@@ -228,4 +228,11 @@ public class MeetingService {
         if (obj instanceof Number) return ((Number) obj).longValue();
         return null;
     }
+   @Transactional
+public int updateThumb(long hostId, long meetingsId, String relPath) {
+    if (relPath == null || relPath.isBlank()) return 0;
+    int n = mapper.updateThumb("tl_meetings", "meetings_id", meetingsId, hostId, relPath.trim());
+    if (n > 0) events.publishEvent(new MeetingUpdatedEvent(meetingsId));
+    return n;
+}
 }

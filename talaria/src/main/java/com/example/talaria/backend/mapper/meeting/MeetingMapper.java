@@ -116,4 +116,11 @@ public interface MeetingMapper {
     int updateCultureMeta(@Param("meetingId") long meetingId,
                           @Param("cultureDesc") String cultureDesc,
                           @Param("cultureThumbRelPath") String cultureThumbRelPath);
+
+   int updateThumb(@Param("table") String table,
+                @Param("pk") String pk,
+                @Param("id") long id,
+                @Param("hostId") long hostId,
+                @Param("cultureThumbRelPath") String cultureThumbRelPath);
+
 }

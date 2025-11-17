@@ -136,6 +136,16 @@ public class MeetingController {
             service.listByUserIncludingParticipant(userId, status, from, to, page, size)
         );
     }
+    @PatchMapping("/{id}/thumb")
+    public ResponseEntity<?> setThumb(
+            @PathVariable("userId") long userId,
+            @PathVariable("id") long id,
+            @RequestBody ThumbReq req
+    ) {
+        int n = service.updateThumb(userId, id, req.getRelPath());
+        return ResponseEntity.ok(Map.of("updated", n, "cultureThumbRelPath", req.getRelPath()));
+    }
+
 
     // ===== DTO =====
     @Data
@@ -172,6 +182,12 @@ public class MeetingController {
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
         private LocalDateTime endedAt;
     }
+    @lombok.Data
+    public static class ThumbReq {
+        @jakarta.validation.constraints.NotBlank
+        private String relPath; // 예: "img/1731821_xxx.png"
+    }
+
 
     // ===== helpers =====
     private static String normalizeMode(String m) {
