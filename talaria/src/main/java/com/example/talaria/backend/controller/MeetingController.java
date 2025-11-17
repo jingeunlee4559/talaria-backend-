@@ -54,7 +54,7 @@ public class MeetingController {
         return row == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(row);
     }
 
-    // 생성 (scheduledAt이 null이면 now()로 보정)  — C모드 & 썸네일 반영
+    // 생성 (scheduledAt null → now() 보정) — status/meetingMode/썸네일 반영
     @PostMapping
     public ResponseEntity<?> create(
             @PathVariable("userId") long userId,
@@ -65,8 +65,9 @@ public class MeetingController {
                     req.getTitle(),
                     req.getDefaultLang(),
                     req.getScheduledAt(),
-                    normalizeMode(req.getMeetingMode()),              // 'B' or 'C'
-                    emptyToNull(req.getCultureThumbRelPath())        // null 허용
+                    normalizeMode(req.getMeetingMode()),                 // 'B' or 'C'
+                    emptyToNull(req.getCultureThumbRelPath()),          // nullable
+                    normalizeStatus(req.getStatus())                    // 'SCHEDULED'/'ONGOING'/'ENDED'
             );
             return ResponseEntity.ok(created);
         } catch (IllegalStateException e) {
@@ -144,12 +145,17 @@ public class MeetingController {
         @Size(max = 10)
         private String defaultLang = "ko";
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-        private LocalDateTime scheduledAt;
+        private LocalDateTime scheduledAt; // null 허용
+
+        // 생성 시 status 입력 가능 (null/유효X → SCHEDULED)
+        @Pattern(regexp = "^(SCHEDULED|ONGOING|ENDED)$",
+                 message = "status must be SCHEDULED, ONGOING, or ENDED")
+        private String status;
 
         @Pattern(regexp = "^[BC]$", message = "meetingMode must be 'B' or 'C'")
-        private String meetingMode;
+        private String meetingMode;                // null 가능 → 기본 B
         @Size(max = 512)
-        private String cultureThumbRelPath;
+        private String cultureThumbRelPath;        // null 가능
     }
 
     @Data
@@ -172,6 +178,11 @@ public class MeetingController {
         if (m == null) return "B";
         String u = m.trim().toUpperCase();
         return (u.equals("C")) ? "C" : "B";
+    }
+    private static String normalizeStatus(String s) {
+        if (s == null) return "SCHEDULED";
+        String u = s.trim().toUpperCase();
+        return (u.equals("SCHEDULED") || u.equals("ONGOING") || u.equals("ENDED")) ? u : "SCHEDULED";
     }
     private static String emptyToNull(String s) {
         return (s == null || s.isBlank()) ? null : s.trim();

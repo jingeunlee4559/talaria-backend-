@@ -46,7 +46,7 @@ public class MeetingService {
         return mapper.selectOneByHost(TABLE, PK, hostId, id);
     }
 
-    //  단건 (meetings_id만으로 조회) — 컨트롤러 countParticipants에서 사용
+    //  단건 (meetings_id만으로 조회)
     public Map<String,Object> getById(long meetingsId) {
         return mapper.selectById(TABLE, PK, meetingsId);
     }
@@ -56,49 +56,53 @@ public class MeetingService {
         return mapper.selectByInviteCode(TABLE, code);
     }
 
-    // 최근 활성 회의(6h 등) 재사용
+    // 최근 활성 회의 재사용
     public Map<String,Object> findRecentActiveByHostAndTitle(long hostId, String title, Duration window) {
         LocalDateTime since = LocalDateTime.now().minus(window);
         return mapper.selectRecentActiveByHostAndTitle(TABLE, hostId, title, since);
     }
 
-    // (Controller에서 쓰는 기본 생성 진입점) null scheduledAt 보정 + 모드/썸네일 반영
+    // 생성 진입점 — status/meetingMode/썸네일 반영
     @Transactional
     public Map<String,Object> create(long hostId,
                                      String title,
                                      String defaultLang,
                                      LocalDateTime scheduledAt,
-                                     String meetingMode,                 // 'B' or 'C'
-                                     String cultureThumbRelPath) {
+                                     String meetingMode,           // 'B'/'C'
+                                     String cultureThumbRelPath,   // nullable
+                                     String requestedStatus) {     // 'SCHEDULED'/'ONGOING'/'ENDED'
         if (scheduledAt == null) scheduledAt = LocalDateTime.now();
-        return createNew(hostId, title, defaultLang, scheduledAt, meetingMode, cultureThumbRelPath);
+        String normStatus = normalizeStatus(requestedStatus);
+        return createNew(hostId, title, defaultLang, scheduledAt, meetingMode, cultureThumbRelPath, normStatus);
     }
 
+    // 기존 호환 (status 미지정 → SCHEDULED)
     @Transactional
     public Map<String,Object> create(long hostId, String title, String defaultLang, LocalDateTime scheduledAt) {
         if (scheduledAt == null) scheduledAt = LocalDateTime.now();
-        return createNew(hostId, title, defaultLang, scheduledAt, "B", null);
+        return createNew(hostId, title, defaultLang, scheduledAt, "B", null, DEFAULT_STATUS);
     }
 
+    // 실제 생성 — status/meetingMode/썸네일 적용
     @Transactional
     public Map<String,Object> createNew(long hostId,
                                         String title,
                                         String defaultLang,
                                         LocalDateTime scheduledAt,
-                                        String meetingMode,                 // 'B' or 'C'
-                                        String cultureThumbRelPath) {
-
-        String mode = (meetingMode != null && meetingMode.equalsIgnoreCase("C")) ? "C" : "B";
+                                        String meetingMode,
+                                        String cultureThumbRelPath,
+                                        String status) {
+        String mode  = (meetingMode != null && meetingMode.equalsIgnoreCase("C")) ? "C" : "B";
         String thumb = (cultureThumbRelPath == null || cultureThumbRelPath.isBlank()) ? null : cultureThumbRelPath.trim();
+        String normStatus = normalizeStatus(status);
 
         String invite = generateInviteCode(10);
         for (int i = 0; i < 10; i++) {
             try {
-                // ★ mapper.insert 시그니처가 확장되어 있어야 함 (meetingMode, cultureThumbRelPath 포함)
-                mapper.insert(TABLE, hostId, title, DEFAULT_STATUS, invite, defaultLang, scheduledAt, mode, thumb);
+                // insert(table, hostId, title, status, invite, defaultLang, scheduledAt, meetingMode, cultureThumbRelPath)
+                mapper.insert(TABLE, hostId, title, normStatus, invite, defaultLang, scheduledAt, mode, thumb);
                 long id = mapper.lastInsertId();
                 Map<String,Object> created = getOneByHost(hostId, id);
-                // AFTER_COMMIT 리스너 동작하도록 이벤트 발행
                 events.publishEvent(new MeetingCreatedEvent(id));
                 return created;
             } catch (DataIntegrityViolationException dup) {
@@ -108,9 +112,10 @@ public class MeetingService {
         throw new IllegalStateException("Failed to generate unique invite_code");
     }
 
+    // 이전 호환 (B 모드, SCHEDULED)
     @Transactional
     public Map<String,Object> createNew(long hostId, String title, String defaultLang, LocalDateTime scheduledAt) {
-        return createNew(hostId, title, defaultLang, scheduledAt, "B", null);
+        return createNew(hostId, title, defaultLang, scheduledAt, "B", null, DEFAULT_STATUS);
     }
 
     // 부분 수정
@@ -165,7 +170,7 @@ public class MeetingService {
         return new String(out);
     }
 
-    // 사용자가 호스트이거나 참가자인 모든 회의 조회 (참가자 정보 포함)
+    // 사용자가 호스트이거나 참가자인 모든 회의 조회
     public PageResponse listByUserIncludingParticipant(
         long userId, String status, LocalDateTime from, LocalDateTime to,
         int page, int size) {
@@ -206,6 +211,12 @@ public class MeetingService {
         }
 
         return new PageResponse(items, page, size, total);
+    }
+
+    private static String normalizeStatus(String s) {
+        if (s == null) return DEFAULT_STATUS;
+        String u = s.trim().toUpperCase();
+        return (u.equals("SCHEDULED") || u.equals("ONGOING") || u.equals("ENDED")) ? u : DEFAULT_STATUS;
     }
 
     // BigInteger, Integer 등을 안전하게 Long으로 변환
