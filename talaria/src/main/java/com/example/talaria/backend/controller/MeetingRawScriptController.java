@@ -6,12 +6,14 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/users/{userId}/meetings/{meetingId}/raw-script")
@@ -29,12 +31,6 @@ public class MeetingRawScriptController {
      *   "meetingTitle": "11월 정기 개발 회의",
      *   "participants": ["김철수", "이영희"]
      * }
-     *
-     * 처리:
-     *  - tl_utterances 를 meeting_id 기준으로 조회
-     *  - 지정된 text 포맷으로 하나의 문자열 생성
-     *  - 파이썬(talaria-ai)으로 전송
-     *  - 생성된 rawScript 및 파이썬 응답을 JSON으로 반환
      */
     @PostMapping
     public ResponseEntity<Map<String, Object>> buildAndSend(
@@ -42,11 +38,16 @@ public class MeetingRawScriptController {
             @PathVariable("meetingId") long meetingId,
             @RequestBody @Valid RawScriptRequest req
     ) {
+
+        log.info("[RawScript] request: userId={}, meetingId={}, title='{}', participants={}",
+                userId, meetingId, req.getMeetingTitle(), req.getParticipants());
+
         Map<String, Object> res = rawScriptService.buildAndSendRawScript(
                 meetingId,
                 req.getMeetingTitle(),
                 req.getParticipants()
         );
+
         return ResponseEntity.ok(res);
     }
 
