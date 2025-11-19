@@ -163,8 +163,8 @@
       ON m.meetings_id = p.meetings_id AND p.user_id = #{userId}
     LEFT JOIN tl_users u
       ON u.user_id = m.host_id
-    WHERE m.host_id = #{userId}
-       OR p.user_id = #{userId}
+    WHERE (m.host_id = #{userId}
+       OR p.user_id = #{userId})
     <if test="status != null and status != ''">
       AND m.status = #{status}
     </if>
@@ -173,6 +173,9 @@
     </if>
     <if test="to != null">
       AND m.scheduled_at &lt;= #{to}
+    </if>
+    <if test="mode != null and mode != ''">
+      AND m.meeting_mode = #{mode}
     </if>
     ORDER BY m.scheduled_at DESC, m.meetings_id DESC
     LIMIT #{limit} OFFSET #{offset}

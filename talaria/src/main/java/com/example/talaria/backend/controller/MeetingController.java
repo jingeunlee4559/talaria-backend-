@@ -179,10 +179,24 @@ public class MeetingController {
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
         @RequestParam(name = "to", required = false)
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+        @RequestParam(name = "mode", required = false) String mode,
         @RequestParam(name = "page", defaultValue = "0")  int page,
         @RequestParam(name = "size", defaultValue = "20") int size) {
+
+        // mode 정제: null/빈문자 → null, "b"/"c" → "B"/"C", 그 외 값은 400
+        String normalizedMode = null;
+        if (mode != null && !mode.isBlank()) {
+            normalizedMode = mode.trim().toUpperCase();
+            if (!normalizedMode.equals("B") && !normalizedMode.equals("C")) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                        "mode 파라미터는 B 또는 C 만 허용됩니다."
+                );
+            }
+        }
+
         return ResponseEntity.ok(
-            service.listByUserIncludingParticipant(userId, status, from, to, page, size)
+            service.listByUserIncludingParticipant(userId, status, from, to, normalizedMode, page, size)
         );
     }
 

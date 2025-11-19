@@ -95,6 +95,7 @@ public interface MeetingMapper {
         @Param("status") String status,
         @Param("from") LocalDateTime from,
         @Param("to") LocalDateTime to,
+        @Param("mode") String mode,
         @Param("limit") int limit,
         @Param("offset") int offset
     );
@@ -103,7 +104,8 @@ public interface MeetingMapper {
         @Param("userId") long userId,
         @Param("status") String status,
         @Param("from") LocalDateTime from,
-        @Param("to") LocalDateTime to
+        @Param("to") LocalDateTime to,
+        @Param("mode") String mode
     );
 
     Map<String, Object> selectById(@Param("table") String table,

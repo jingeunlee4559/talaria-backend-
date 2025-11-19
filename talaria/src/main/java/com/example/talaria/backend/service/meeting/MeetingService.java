@@ -197,14 +197,15 @@ public class MeetingService {
     // 사용자가 호스트이거나 참가자인 모든 회의 조회
     public PageResponse listByUserIncludingParticipant(
         long userId, String status, LocalDateTime from, LocalDateTime to,
+        String mode,   // ★ 추가: B/C 또는 null
         int page, int size) {
 
         if (size > 100) size = 100;
         int offset = page * size;
 
-        long total = mapper.countByUserIncludingParticipant(userId, status, from, to);
+        long total = mapper.countByUserIncludingParticipant(userId, status, from, to, mode);
         List<Map<String,Object>> items = mapper.selectByUserIncludingParticipant(
-            userId, status, from, to, size, offset
+            userId, status, from, to, mode, size, offset
         );
 
         for (Map<String, Object> meeting : items) {
