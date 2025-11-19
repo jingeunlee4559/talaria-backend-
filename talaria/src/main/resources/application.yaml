@@ -27,6 +27,7 @@ server:
 talaria:
   aiBaseUrl: "http://127.0.0.1:8000"
   sessionTtlSeconds: 60
+  summarizeUrl: ${TALARIA_SUMMARIZE_URL:}
   files:
     frontPublicRoot: "C:/workspace/gitaction_assignment/talaria-frontend/public"
     cultureThumbBaseDir: "/img"
