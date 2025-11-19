@@ -25,7 +25,7 @@ server:
     include-binding-errors: always
 
 talaria:
-  aiBaseUrl: "https://127.0.0.1:8000"
+  aiBaseUrl: "http://127.0.0.1:8000"
   sessionTtlSeconds: 60
   files:
     frontPublicRoot: "C:/workspace/gitaction_assignment/talaria-frontend/public"
