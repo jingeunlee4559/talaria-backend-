@@ -128,4 +128,15 @@ public interface MeetingMapper {
                     @Param("id") long id,
                     @Param("hostId") long hostId,
                     @Param("cultureThumbRelPath") String cultureThumbRelPath);
+
+    // 썸네일 + 비공개 설정 동시 업데이트
+    int updateThumbAndPrivacy(@Param("table") String table,
+                              @Param("pk") String pk,
+                              @Param("id") long id,
+                              @Param("hostId") long hostId,
+                              @Param("cultureThumbRelPath") String cultureThumbRelPath,
+                              @Param("isPrivate") Boolean isPrivate,
+                              @Param("privatePassword") String privatePassword);
+
+    Map<String, Object> selectPrivateInfo(@Param("meetingId") long meetingId);
 }

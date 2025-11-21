@@ -329,4 +329,51 @@ public class MeetingService {
         if (n > 0) events.publishEvent(new MeetingUpdatedEvent(meetingsId));
         return n;
     }
+
+    /* =========================
+       썸네일 + 비공개 설정 동시 업데이트
+       (/api/assets/users/{userId}/meetings/{id}/thumb)
+       ========================= */
+    @Transactional
+    public int updateThumbAndPrivacy(long hostId,
+                                     long meetingsId,
+                                     String relPath,
+                                     Boolean isPrivate,
+                                     String privatePassword) {
+        if (relPath == null || relPath.isBlank()) return 0;
+        String store = relPath.startsWith("/") ? relPath : ("/" + relPath); // 항상 "/img/..."로 저장
+
+        int n = mapper.updateThumbAndPrivacy(
+                TABLE,
+                PK,
+                meetingsId,
+                hostId,
+                store,
+                isPrivate,        // null 이면 is_private 변경 안 함
+                privatePassword   // null 이면 private_password 변경 안 함
+        );
+        if (n > 0) {
+            events.publishEvent(new MeetingUpdatedEvent(meetingsId));
+        }
+        return n;
+    }
+
+    // 비밀번호 검증
+    public boolean checkPrivatePassword(long meetingId, String password) {
+        Map<String, Object> row = mapper.selectPrivateInfo(meetingId);
+
+        if (row == null) return false;
+
+        Boolean isPrivate = (Boolean) row.get("is_private");
+        String storedPw = (String) row.get("private_password");
+
+        // 공개 회의이면 무조건 통과
+        if (isPrivate == null || !isPrivate) return true;
+
+        // 비공개인데 비밀번호 없음 → 실패
+        if (storedPw == null || storedPw.isBlank()) return false;
+
+        // 비밀번호 비교
+        return storedPw.equals(password);
+    }
 }

@@ -380,4 +380,32 @@
       AND host_id = #{hostId}
   </update>
 
+  <!-- 썸네일 + 비공개 설정 동시 업데이트 -->
+  <update id="updateThumbAndPrivacy">
+    UPDATE ${table}
+    <set>
+      <if test="cultureThumbRelPath != null">
+        culture_thumb_rel_path = #{cultureThumbRelPath},
+      </if>
+      <if test="isPrivate != null">
+        is_private = #{isPrivate},
+      </if>
+      <if test="privatePassword != null">
+        private_password = #{privatePassword},
+      </if>
+      updated_at = CURRENT_TIMESTAMP
+    </set>
+    WHERE ${pk} = #{id}
+      AND host_id = #{hostId}
+  </update>
+
+  <select id="selectPrivateInfo" parameterType="long" resultType="map">
+      SELECT
+          meetings_id,
+          is_private,
+          private_password
+      FROM tl_meetings
+      WHERE meetings_id = #{meetingId}
+  </select>
+
 </mapper>
