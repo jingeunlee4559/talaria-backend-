@@ -342,4 +342,13 @@
       AND host_id = #{hostId}
   </update>
 
+  <select id="selectPrivateInfo" parameterType="long" resultType="map">
+      SELECT
+          meetings_id,
+          is_private,
+          private_password
+      FROM tl_meetings
+      WHERE meetings_id = #{meetingId}
+  </select>
+
 </mapper>

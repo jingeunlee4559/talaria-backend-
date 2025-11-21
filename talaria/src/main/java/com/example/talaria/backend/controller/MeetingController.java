@@ -203,6 +203,19 @@ public class MeetingController {
             service.listByUserIncludingParticipant(userId, status, from, to, normalizedMode, page, size)
         );
     }
+    // 비공개 회의 비밀번호 검증
+    @PostMapping("/{meetingId}/check-password")
+    public ResponseEntity<Map<String, Object>> checkPrivatePassword(
+            @PathVariable("userId") long userId,
+            @PathVariable("meetingId") long meetingId,
+            @RequestBody Map<String, String> body
+    ) {
+        String password = body.get("password");
+        boolean ok = service.checkPrivatePassword(meetingId, password);
+
+        return ResponseEntity.ok(Map.of("valid", ok));
+    }
+
 
     // ===== DTO =====
     @Data

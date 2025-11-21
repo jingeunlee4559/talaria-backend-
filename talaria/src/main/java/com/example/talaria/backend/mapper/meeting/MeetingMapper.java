@@ -128,4 +128,6 @@ public interface MeetingMapper {
                     @Param("id") long id,
                     @Param("hostId") long hostId,
                     @Param("cultureThumbRelPath") String cultureThumbRelPath);
+
+    Map<String, Object> selectPrivateInfo(@Param("meetingId") long meetingId);
 }

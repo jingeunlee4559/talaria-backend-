@@ -334,6 +334,25 @@ public class MeetingService {
         if (obj instanceof Number) return ((Number) obj).longValue();
         return null;
     }
+    // 비밀번호 검증
+    public boolean checkPrivatePassword(long meetingId, String password) {
+        Map<String, Object> row = mapper.selectPrivateInfo(meetingId);
+
+        if (row == null) return false;
+
+        Boolean isPrivate = (Boolean) row.get("is_private");
+        String storedPw = (String) row.get("private_password");
+
+        // 공개 회의이면 무조건 통과
+        if (isPrivate == null || !isPrivate) return true;
+
+        // 비공개인데 비밀번호 없음 → 실패
+        if (storedPw == null || storedPw.isBlank()) return false;
+
+        // 비밀번호 비교
+        return storedPw.equals(password);
+    }
+
 
     /* =========================
        썸네일 단독 업데이트 (/api/assets/.../thumb)
