@@ -37,7 +37,7 @@ public interface MeetingMapper {
                                                         @Param("title") String title,
                                                         @Param("since") LocalDateTime since);
 
-    //  isPrivate / privatePassword 추가된 insert 시그니처
+    // INSERT: is_private / private_password 포함
     int insert(@Param("table") String table,
                @Param("hostId") long hostId,
                @Param("title") String title,
@@ -128,6 +128,4 @@ public interface MeetingMapper {
                     @Param("id") long id,
                     @Param("hostId") long hostId,
                     @Param("cultureThumbRelPath") String cultureThumbRelPath);
-
-    Map<String, Object> selectPrivateInfo(@Param("meetingId") long meetingId);
 }

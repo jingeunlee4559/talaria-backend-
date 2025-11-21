@@ -3,6 +3,7 @@ package com.example.talaria.backend.controller;
 import com.example.talaria.backend.dto.common.PageResponse;
 import com.example.talaria.backend.service.asset.FrontAssetStorage;
 import com.example.talaria.backend.service.meeting.MeetingService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -15,6 +16,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.time.LocalDateTime;
@@ -27,6 +29,7 @@ public class MeetingController {
 
     private final MeetingService service;
     private final FrontAssetStorage frontAssetStorage; // 프론트 퍼블릭 디렉터리 저장
+    private final ObjectMapper objectMapper;          // ★ 문자열 JSON 파싱용
 
     // 목록 조회 (호스트 기준)
     @GetMapping
@@ -92,14 +95,39 @@ public class MeetingController {
         }
     }
 
-    // (2) multipart/form-data로 생성 (파일 업로드 포함)
+    // (2) multipart/form-data로 생성 (파일 업로드 포함, req는 문자열 JSON)
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> createWithThumb(
             @PathVariable("userId") long userId,
-            @Valid @ModelAttribute CreateMeetingReq req,                       // 텍스트 파트들
-            @RequestPart(name = "cultureThumb", required = false) MultipartFile cultureThumb // 파일 파트
+            @RequestPart(name = "req", required = false) String reqJson,             // ★ 문자열
+            @RequestPart(name = "cultureThumb", required = false) MultipartFile cultureThumb
     ) {
         try {
+            // reqJson → DTO 변환
+            CreateMeetingReq req;
+            if (reqJson == null || reqJson.isBlank()) {
+                throw new ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                        "req 파트(JSON 문자열)가 필요합니다."
+                );
+            }
+            try {
+                req = objectMapper.readValue(reqJson, CreateMeetingReq.class);
+            } catch (Exception parseEx) {
+                throw new ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                        "req JSON 파싱 실패: " + parseEx.getMessage()
+                );
+            }
+
+            // title 필수 검증 (예전처럼 @NotBlank 대체)
+            if (req.getTitle() == null || req.getTitle().isBlank()) {
+                throw new ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                        "title은 공백일 수 없습니다."
+                );
+            }
+
             // 파일 저장 (null/빈파일이면 null 리턴)
             String savedRel = frontAssetStorage.saveCultureThumb(cultureThumb);
 
@@ -109,14 +137,20 @@ public class MeetingController {
                     req.getDefaultLang(),
                     req.getScheduledAt(),
                     normalizeMode(req.getMeetingMode()),
-                    // 파일이 올라오면 저장된 경로 사용, 아니면 사용자가 form-data로 준 경로 사용
                     (savedRel != null ? savedRel : emptyToNull(req.getCultureThumbRelPath())),
                     normalizeStatus(req.getStatus()),
-                    emptyToNull(req.getCultureDesc()),                 // culture_desc
-                    req.getIsPrivate(),                                // 비공개 여부
-                    emptyToNull(req.getPrivatePassword())              // 비밀번호
+                    emptyToNull(req.getCultureDesc()),
+                    req.getIsPrivate(),
+                    emptyToNull(req.getPrivatePassword())
             );
             return ResponseEntity.ok(created);
+        } catch (ResponseStatusException ex) {
+            // 400 등 명시적 에러
+            return ResponseEntity.status(ex.getStatusCode())
+                    .body(Map.of(
+                            "status", ex.getStatusCode().value(),
+                            "error", ex.getReason()
+                    ));
         } catch (IllegalStateException e) {
             var pd = ProblemDetail.forStatus(409);
             pd.setTitle("Conflict");
@@ -138,7 +172,7 @@ public class MeetingController {
         }
     }
 
-    // 부분 수정(제목/언어/시간/상태 등) — 필요 시 cultureDesc도 PATCH에 포함 가능
+    // 부분 수정(제목/언어/시간/상태 등)
     @PatchMapping("/{id}")
     public ResponseEntity<Map<String,Object>> patch(
             @PathVariable("userId") long userId,
@@ -187,7 +221,7 @@ public class MeetingController {
         @RequestParam(name = "page", defaultValue = "0")  int page,
         @RequestParam(name = "size", defaultValue = "20") int size) {
 
-        // mode 정제: null/빈문자 → null, "b"/"c" → "B"/"C", 그 외 값은 400
+        // mode 정제
         String normalizedMode = null;
         if (mode != null && !mode.isBlank()) {
             normalizedMode = mode.trim().toUpperCase();
@@ -203,19 +237,6 @@ public class MeetingController {
             service.listByUserIncludingParticipant(userId, status, from, to, normalizedMode, page, size)
         );
     }
-    // 비공개 회의 비밀번호 검증
-    @PostMapping("/{meetingId}/check-password")
-    public ResponseEntity<Map<String, Object>> checkPrivatePassword(
-            @PathVariable("userId") long userId,
-            @PathVariable("meetingId") long meetingId,
-            @RequestBody Map<String, String> body
-    ) {
-        String password = body.get("password");
-        boolean ok = service.checkPrivatePassword(meetingId, password);
-
-        return ResponseEntity.ok(Map.of("valid", ok));
-    }
-
 
     // ===== DTO =====
     @Data
@@ -233,20 +254,20 @@ public class MeetingController {
                  message = "status must be SCHEDULED, ONGOING, or ENDED")
         private String status;
 
-        @Pattern(regexp = "^[BC]$", message = "meetingMode must be 'B' or 'C'")
-        private String meetingMode;                // null → 기본 B
+        @Pattern(regexp = "^[BC]$", message = "meetingMode must be 'B' or 'C'") // null → 기본 B
+        private String meetingMode;
 
         @Size(max = 512)
-        private String cultureThumbRelPath;        // 파일 없이 경로만 줄 때 사용
+        private String cultureThumbRelPath;
 
         @Size(max = 500)
-        private String cultureDesc;                // culture_desc
+        private String cultureDesc;
 
         // C 모드 비공개 설정
-        private Boolean isPrivate;                 // true면 비공개, false/null이면 공개
+        private Boolean isPrivate; // true면 비공개, false/null이면 공개
 
         @Size(max = 128)
-        private String privatePassword;            // 비공개방 비밀번호 (C 모드 + isPrivate=true일 때 사용)
+        private String privatePassword;
     }
 
     @Data
@@ -262,7 +283,6 @@ public class MeetingController {
         private LocalDateTime scheduledAt;
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
         private LocalDateTime endedAt;
-        // 필요 시 cultureDesc / isPrivate / privatePassword 도 PATCH에 포함 가능
     }
 
     // ===== helpers =====
