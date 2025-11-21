@@ -2,6 +2,7 @@
 <!DOCTYPE mapper
   PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
 <mapper namespace="com.example.talaria.backend.mapper.meeting.MeetingMapper">
 
   <!-- ===== 호스트 기준: 카운트/목록 ===== -->
@@ -23,11 +24,14 @@
   <select id="selectPageByHost" resultType="map">
     SELECT
       meetings_id, host_id, title, status, invite_code,
-      default_lang, meeting_mode, scheduled_at, created_at, updated_at, ended_at,
+      default_lang, meeting_mode, scheduled_at, created_at,
+      updated_at, ended_at,
       COALESCE(culture_desc, '')            AS culture_desc,
       COALESCE(culture_desc, '')            AS cultureDesc,
       COALESCE(culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
-      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath
+      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath,
+      is_private,
+      private_password
     FROM tl_meetings
     WHERE host_id = #{hostId}
     <if test="status != null and status != ''">
@@ -46,11 +50,14 @@
   <select id="selectOneByHost" resultType="map">
     SELECT
       meetings_id, host_id, title, status, invite_code,
-      default_lang, meeting_mode, scheduled_at, created_at, updated_at, ended_at,
+      default_lang, meeting_mode, scheduled_at, created_at,
+      updated_at, ended_at,
       COALESCE(culture_desc, '')            AS culture_desc,
       COALESCE(culture_desc, '')            AS cultureDesc,
       COALESCE(culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
-      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath
+      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath,
+      is_private,
+      private_password
     FROM tl_meetings
     WHERE ${pk} = #{id}
       AND host_id = #{hostId}
@@ -64,7 +71,9 @@
       COALESCE(culture_desc, '')            AS culture_desc,
       COALESCE(culture_desc, '')            AS cultureDesc,
       COALESCE(culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
-      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath
+      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath,
+      is_private,
+      private_password
     FROM tl_meetings
     WHERE invite_code = #{inviteCode}
     LIMIT 1
@@ -77,7 +86,9 @@
       COALESCE(culture_desc, '')            AS culture_desc,
       COALESCE(culture_desc, '')            AS cultureDesc,
       COALESCE(culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
-      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath
+      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath,
+      is_private,
+      private_password
     FROM tl_meetings
     WHERE host_id = #{hostId}
       AND title = #{title}
@@ -89,11 +100,32 @@
 
   <!-- ===== 생성 ===== -->
   <insert id="insert">
-    INSERT INTO tl_meetings
-      (host_id, title, status, invite_code, default_lang, scheduled_at, meeting_mode, culture_thumb_rel_path, culture_desc)
-    VALUES
-      (#{hostId}, #{title}, #{status}, #{inviteCode}, #{defaultLang}, #{scheduledAt}, #{meetingMode}, #{cultureThumbRelPath}, #{cultureDesc})
-  </insert>
+  INSERT INTO tl_meetings
+    (host_id,
+     title,
+     status,
+     invite_code,
+     default_lang,
+     scheduled_at,
+     meeting_mode,
+     culture_thumb_rel_path,
+     culture_desc,
+     is_private,
+     private_password)
+  VALUES
+    (#{hostId},
+     #{title},
+     #{status},
+     #{inviteCode},
+     #{defaultLang},
+     #{scheduledAt},
+     #{meetingMode},
+     #{cultureThumbRelPath},
+     #{cultureDesc},
+     #{isPrivate},
+     #{privatePassword})
+</insert>
+
 
   <select id="lastInsertId" resultType="long">
     SELECT LAST_INSERT_ID()
@@ -136,11 +168,15 @@
     WHERE ${pk} = #{id} AND host_id = #{hostId}
   </update>
 
-  <!-- ===== 사용자 기준 목록 ===== -->
+  <!-- ===== 사용자 기준 목록 (/all) ===== -->
   <select id="selectByUserIncludingParticipant" resultType="map">
     SELECT DISTINCT
       m.meetings_id,
       m.host_id,
+      u.name  AS host_name,
+      u.email AS host_email,
+      u.profile_image_url AS host_profile_image_url,
+      u.locale AS host_locale,
       m.title,
       m.status,
       m.invite_code,
@@ -149,33 +185,34 @@
       m.scheduled_at,
       m.ended_at,
       m.created_at,
-      CASE WHEN m.host_id = #{userId} THEN 'HOST' ELSE COALESCE(p.role, 'GUEST') END AS user_role,
-      u.name  AS host_name,
-      u.email AS host_email,
-      u.profile_image_url AS host_profile_image_url,
-      u.locale AS host_locale,
       COALESCE(m.culture_desc, '')            AS culture_desc,
       COALESCE(m.culture_desc, '')            AS cultureDesc,
       COALESCE(m.culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
-      COALESCE(m.culture_thumb_rel_path, '')  AS cultureThumbRelPath
+      COALESCE(m.culture_thumb_rel_path, '')  AS cultureThumbRelPath,
+      m.is_private,
+      m.private_password,
+      CASE
+        WHEN m.host_id = #{userId} THEN 'HOST'
+        ELSE COALESCE(p.role, 'GUEST')
+      END AS user_role
     FROM tl_meetings m
     LEFT JOIN tl_meeting_participants p
-      ON m.meetings_id = p.meetings_id AND p.user_id = #{userId}
+      ON m.meetings_id = p.meetings_id
+      AND p.user_id = #{userId}
     LEFT JOIN tl_users u
       ON u.user_id = m.host_id
-    WHERE (m.host_id = #{userId}
-       OR p.user_id = #{userId})
+    WHERE (m.host_id = #{userId} OR p.user_id = #{userId})
     <if test="status != null and status != ''">
       AND m.status = #{status}
+    </if>
+    <if test="mode != null and mode != ''">
+      AND m.meeting_mode = #{mode}
     </if>
     <if test="from != null">
       AND m.scheduled_at &gt;= #{from}
     </if>
     <if test="to != null">
       AND m.scheduled_at &lt;= #{to}
-    </if>
-    <if test="mode != null and mode != ''">
-      AND m.meeting_mode = #{mode}
     </if>
     ORDER BY m.scheduled_at DESC, m.meetings_id DESC
     LIMIT #{limit} OFFSET #{offset}
@@ -185,11 +222,14 @@
     SELECT COUNT(DISTINCT m.meetings_id)
     FROM tl_meetings m
     LEFT JOIN tl_meeting_participants p
-      ON m.meetings_id = p.meetings_id AND p.user_id = #{userId}
-    WHERE m.host_id = #{userId}
-       OR p.user_id = #{userId}
+      ON m.meetings_id = p.meetings_id
+      AND p.user_id = #{userId}
+    WHERE (m.host_id = #{userId} OR p.user_id = #{userId})
     <if test="status != null and status != ''">
       AND m.status = #{status}
+    </if>
+    <if test="mode != null and mode != ''">
+      AND m.meeting_mode = #{mode}
     </if>
     <if test="from != null">
       AND m.scheduled_at &gt;= #{from}
@@ -207,7 +247,9 @@
       COALESCE(culture_desc, '')            AS culture_desc,
       COALESCE(culture_desc, '')            AS cultureDesc,
       COALESCE(culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
-      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath
+      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath,
+      is_private,
+      private_password
     FROM tl_meetings
     WHERE ${pk} = #{id}
     LIMIT 1
@@ -220,7 +262,9 @@
       COALESCE(culture_desc, '')            AS culture_desc,
       COALESCE(culture_desc, '')            AS cultureDesc,
       COALESCE(culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
-      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath
+      COALESCE(culture_thumb_rel_path, '')  AS cultureThumbRelPath,
+      is_private,
+      private_password
     FROM tl_meetings
     WHERE meetings_id = #{meetingId}
     LIMIT 1
@@ -274,7 +318,9 @@
       COALESCE(m.culture_desc, '')            AS culture_desc,
       COALESCE(m.culture_desc, '')            AS cultureDesc,
       COALESCE(m.culture_thumb_rel_path, '')  AS culture_thumb_rel_path,
-      COALESCE(m.culture_thumb_rel_path, '')  AS cultureThumbRelPath
+      COALESCE(m.culture_thumb_rel_path, '')  AS cultureThumbRelPath,
+      m.is_private,
+      m.private_password
     FROM tl_meetings m
     LEFT JOIN tl_users u ON u.user_id = m.host_id
     WHERE m.meeting_mode = #{mode}

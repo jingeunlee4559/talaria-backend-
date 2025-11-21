@@ -28,7 +28,7 @@ public class MeetingController {
     private final MeetingService service;
     private final FrontAssetStorage frontAssetStorage; // 프론트 퍼블릭 디렉터리 저장
 
-    // 목록 조회
+    // 목록 조회 (호스트 기준)
     @GetMapping
     public ResponseEntity<PageResponse> list(
             @PathVariable("userId") long userId,
@@ -42,7 +42,7 @@ public class MeetingController {
         return ResponseEntity.ok(service.listByHost(userId, status, from, to, page, size));
     }
 
-    // 단건 조회
+    // 단건 조회 (호스트 기준)
     @GetMapping("/{id}")
     public ResponseEntity<Map<String,Object>> getOne(
             @PathVariable("userId") long userId,
@@ -72,7 +72,9 @@ public class MeetingController {
                     normalizeMode(req.getMeetingMode()),                // 'B' or 'C'
                     emptyToNull(req.getCultureThumbRelPath()),         // 파일 없이 경로만 전달 가능
                     normalizeStatus(req.getStatus()),
-                    emptyToNull(req.getCultureDesc())                  // ★ culture_desc
+                    emptyToNull(req.getCultureDesc()),                 // culture_desc
+                    req.getIsPrivate(),                                // 비공개 여부
+                    emptyToNull(req.getPrivatePassword())              // 비밀번호
             );
             return ResponseEntity.ok(created);
         } catch (IllegalStateException e) {
@@ -110,7 +112,9 @@ public class MeetingController {
                     // 파일이 올라오면 저장된 경로 사용, 아니면 사용자가 form-data로 준 경로 사용
                     (savedRel != null ? savedRel : emptyToNull(req.getCultureThumbRelPath())),
                     normalizeStatus(req.getStatus()),
-                    emptyToNull(req.getCultureDesc())                 // ★ culture_desc
+                    emptyToNull(req.getCultureDesc()),                 // culture_desc
+                    req.getIsPrivate(),                                // 비공개 여부
+                    emptyToNull(req.getPrivatePassword())              // 비밀번호
             );
             return ResponseEntity.ok(created);
         } catch (IllegalStateException e) {
@@ -223,7 +227,13 @@ public class MeetingController {
         private String cultureThumbRelPath;        // 파일 없이 경로만 줄 때 사용
 
         @Size(max = 500)
-        private String cultureDesc;                // ★ culture_desc
+        private String cultureDesc;                // culture_desc
+
+        // C 모드 비공개 설정
+        private Boolean isPrivate;                 // true면 비공개, false/null이면 공개
+
+        @Size(max = 128)
+        private String privatePassword;            // 비공개방 비밀번호 (C 모드 + isPrivate=true일 때 사용)
     }
 
     @Data
@@ -239,8 +249,7 @@ public class MeetingController {
         private LocalDateTime scheduledAt;
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
         private LocalDateTime endedAt;
-        // 필요 시 cultureDesc도 PATCH에 포함하고 mapper.updatePartial에 반영 가능
-        // private String cultureDesc;
+        // 필요 시 cultureDesc / isPrivate / privatePassword 도 PATCH에 포함 가능
     }
 
     // ===== helpers =====

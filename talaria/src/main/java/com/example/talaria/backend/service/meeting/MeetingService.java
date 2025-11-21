@@ -27,7 +27,7 @@ public class MeetingService {
     private static final String PK    = "meetings_id";
     private static final String DEFAULT_STATUS = "SCHEDULED";
 
-    // 목록
+    // 목록 (호스트 기준)
     public PageResponse listByHost(long hostId, String status, LocalDateTime from, LocalDateTime to,
                                    int page, int size) {
         if (size > 100) size = 100;
@@ -43,7 +43,7 @@ public class MeetingService {
         return mapper.selectOneByHost(TABLE, PK, hostId, id);
     }
 
-    //  단건 (meetings_id만으로 조회)
+    // 단건 (meetings_id만으로 조회)
     public Map<String,Object> getById(long meetingsId) {
         return mapper.selectById(TABLE, PK, meetingsId);
     }
@@ -73,12 +73,14 @@ public class MeetingService {
                                      String requestedStatus) {     // 'SCHEDULED'/'ONGOING'/'ENDED'
         if (scheduledAt == null) scheduledAt = LocalDateTime.now();
         String normStatus = normalizeStatus(requestedStatus);
-        return createNew(hostId, title, defaultLang, scheduledAt, meetingMode, cultureThumbRelPath, null, normStatus);
+        // 비공개/비밀번호는 사용 안 함 (기본 공개방)
+        return createNew(hostId, title, defaultLang, scheduledAt,
+                meetingMode, cultureThumbRelPath, null, normStatus,
+                false, null);
     }
 
     /* =========================
-       생성부 (오버로드 2) — cultureDesc 추가
-       컨트롤러에서 cultureDesc까지 받는 경우 이 메서드를 호출
+       생성부 (오버로드 2) — cultureDesc까지 (기존 호출 호환)
        ========================= */
     @Transactional
     public Map<String,Object> create(long hostId,
@@ -92,18 +94,49 @@ public class MeetingService {
     ) {
         if (scheduledAt == null) scheduledAt = LocalDateTime.now();
         String normStatus = normalizeStatus(requestedStatus);
-        return createNew(hostId, title, defaultLang, scheduledAt, meetingMode, cultureThumbRelPath, cultureDesc, normStatus);
+        // 비공개/비밀번호는 사용 안 함 (기본 공개방)
+        return createNew(hostId, title, defaultLang, scheduledAt,
+                meetingMode, cultureThumbRelPath, cultureDesc, normStatus,
+                false, null);
+    }
+
+    /* =========================
+       생성부 (오버로드 3) — cultureDesc + 비공개방 설정 (Controller 신규 진입점)
+       ========================= */
+    @Transactional
+    public Map<String,Object> create(long hostId,
+                                     String title,
+                                     String defaultLang,
+                                     LocalDateTime scheduledAt,
+                                     String meetingMode,           // 'B'/'C'
+                                     String cultureThumbRelPath,   // nullable
+                                     String requestedStatus,       // 'SCHEDULED'/'ONGOING'/'ENDED'
+                                     String cultureDesc,           // nullable
+                                     Boolean isPrivate,            // nullable
+                                     String privatePassword        // nullable
+    ) {
+        if (scheduledAt == null) scheduledAt = LocalDateTime.now();
+        String normStatus = normalizeStatus(requestedStatus);
+        return createNew(hostId, title, defaultLang, scheduledAt,
+                meetingMode, cultureThumbRelPath, cultureDesc, normStatus,
+                isPrivate, privatePassword);
     }
 
     // 기존 호환 (status 미지정 → SCHEDULED)
     @Transactional
-    public Map<String,Object> create(long hostId, String title, String defaultLang, LocalDateTime scheduledAt) {
+    public Map<String,Object> create(long hostId,
+                                     String title,
+                                     String defaultLang,
+                                     LocalDateTime scheduledAt) {
         if (scheduledAt == null) scheduledAt = LocalDateTime.now();
-        return createNew(hostId, title, defaultLang, scheduledAt, "B", null, null, DEFAULT_STATUS);
+        return createNew(hostId, title, defaultLang, scheduledAt,
+                "B", null, null, DEFAULT_STATUS,
+                false, null);
     }
 
     /* =========================
-       실제 생성 — meeting_mode / culture_thumb_rel_path / culture_desc / status 적용
+       실제 생성 — meeting_mode / culture_thumb_rel_path /
+                 culture_desc / status / 비공개방 적용
        ========================= */
     @Transactional
     public Map<String,Object> createNew(long hostId,
@@ -112,18 +145,59 @@ public class MeetingService {
                                         LocalDateTime scheduledAt,
                                         String meetingMode,
                                         String cultureThumbRelPath,
-                                        String cultureDesc,         // ★ 신규
-                                        String status) {
+                                        String cultureDesc,
+                                        String status,
+                                        Boolean isPrivate,          // nullable
+                                        String privatePassword      // nullable
+    ) {
         String mode  = (meetingMode != null && meetingMode.equalsIgnoreCase("C")) ? "C" : "B";
-        String thumb = (cultureThumbRelPath == null || cultureThumbRelPath.isBlank()) ? null : cultureThumbRelPath.trim();
+        String thumb = (cultureThumbRelPath == null || cultureThumbRelPath.isBlank())
+                ? null : cultureThumbRelPath.trim();
         if (thumb != null && !thumb.startsWith("/")) thumb = "/" + thumb; // URL 일관성: 항상 "/img/..."
         String normStatus = normalizeStatus(status);
+
+        // C 모드에서만 비공개/비밀번호 의미 있음
+        boolean privateFlag;
+        String pwStore = null;
+
+        if ("C".equals(mode)) {
+            privateFlag = Boolean.TRUE.equals(isPrivate);
+            if (privateFlag) {
+                if (privatePassword != null && !privatePassword.isBlank()) {
+                    pwStore = privatePassword.trim();
+                    // 실서비스에서는 여기서 해시 처리 권장 (ex. BCrypt)
+                } else {
+                    // 비밀번호가 없으면 강제로 공개방 처리
+                    privateFlag = false;
+                }
+            }
+        } else {
+            // B 모드는 무조건 공개
+            privateFlag = false;
+            pwStore = null;
+        }
 
         String invite = generateInviteCode(10);
         for (int i = 0; i < 10; i++) {
             try {
-                // INSERT: (table, hostId, title, status, invite, defaultLang, scheduledAt, meetingMode, cultureThumbRelPath, cultureDesc)
-                mapper.insert(TABLE, hostId, title, normStatus, invite, defaultLang, scheduledAt, mode, thumb, cultureDesc);
+                // INSERT:
+                // (table, hostId, title, status, invite, defaultLang,
+                //  scheduledAt, meetingMode, cultureThumbRelPath,
+                //  cultureDesc, isPrivate, privatePassword)
+                mapper.insert(
+                        TABLE,
+                        hostId,
+                        title,
+                        normStatus,
+                        invite,
+                        defaultLang,
+                        scheduledAt,
+                        mode,
+                        thumb,
+                        cultureDesc,
+                        privateFlag,
+                        pwStore
+                );
                 long id = mapper.lastInsertId();
                 Map<String,Object> created = getOneByHost(hostId, id);
                 events.publishEvent(new MeetingCreatedEvent(id));
@@ -136,10 +210,15 @@ public class MeetingService {
         throw new IllegalStateException("Failed to generate unique invite_code");
     }
 
-    // 이전 호환 (B 모드, SCHEDULED)
+    // 이전 호환 (B 모드, SCHEDULED) — 내부에서 사용
     @Transactional
-    public Map<String,Object> createNew(long hostId, String title, String defaultLang, LocalDateTime scheduledAt) {
-        return createNew(hostId, title, defaultLang, scheduledAt, "B", null, null, DEFAULT_STATUS);
+    public Map<String,Object> createNew(long hostId,
+                                        String title,
+                                        String defaultLang,
+                                        LocalDateTime scheduledAt) {
+        return createNew(hostId, title, defaultLang, scheduledAt,
+                "B", null, null, DEFAULT_STATUS,
+                false, null);
     }
 
     // 부분 수정
@@ -147,7 +226,8 @@ public class MeetingService {
     public int updatePartial(long hostId, long id, String title, String status,
                              String inviteCode, String defaultLang,
                              LocalDateTime scheduledAt, LocalDateTime endedAt) {
-        int updated = mapper.updatePartial(TABLE, PK, id, hostId, title, status, inviteCode, defaultLang, scheduledAt, endedAt);
+        int updated = mapper.updatePartial(TABLE, PK, id, hostId,
+                title, status, inviteCode, defaultLang, scheduledAt, endedAt);
         if (updated > 0) {
             events.publishEvent(new MeetingUpdatedEvent(id));
         }
@@ -186,7 +266,8 @@ public class MeetingService {
     }
 
     // 랜덤 초대코드
-    private static final char[] ALPHANUM = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".toCharArray();
+    private static final char[] ALPHANUM =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".toCharArray();
     private static final SecureRandom RND = new SecureRandom();
     private static String generateInviteCode(int len) {
         char[] out = new char[len];
@@ -197,7 +278,7 @@ public class MeetingService {
     // 사용자가 호스트이거나 참가자인 모든 회의 조회
     public PageResponse listByUserIncludingParticipant(
         long userId, String status, LocalDateTime from, LocalDateTime to,
-        String mode,   // ★ 추가: B/C 또는 null
+        String mode,   // B/C 또는 null
         int page, int size) {
 
         if (size > 100) size = 100;

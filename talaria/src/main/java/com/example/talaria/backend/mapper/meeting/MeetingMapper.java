@@ -37,6 +37,7 @@ public interface MeetingMapper {
                                                         @Param("title") String title,
                                                         @Param("since") LocalDateTime since);
 
+    //  isPrivate / privatePassword 추가된 insert 시그니처
     int insert(@Param("table") String table,
                @Param("hostId") long hostId,
                @Param("title") String title,
@@ -44,9 +45,11 @@ public interface MeetingMapper {
                @Param("inviteCode") String inviteCode,
                @Param("defaultLang") String defaultLang,
                @Param("scheduledAt") LocalDateTime scheduledAt,
-               @Param("meetingMode") String meetingMode,                 
+               @Param("meetingMode") String meetingMode,
                @Param("cultureThumbRelPath") String cultureThumbRelPath,
-               @Param("cultureDesc") String cultureDesc);
+               @Param("cultureDesc") String cultureDesc,
+               @Param("isPrivate") Boolean isPrivate,
+               @Param("privatePassword") String privatePassword);
 
     long lastInsertId();
 
@@ -120,10 +123,9 @@ public interface MeetingMapper {
                           @Param("cultureDesc") String cultureDesc,
                           @Param("cultureThumbRelPath") String cultureThumbRelPath);
 
-   int updateThumb(@Param("table") String table,
-                @Param("pk") String pk,
-                @Param("id") long id,
-                @Param("hostId") long hostId,
-                @Param("cultureThumbRelPath") String cultureThumbRelPath);
-
+    int updateThumb(@Param("table") String table,
+                    @Param("pk") String pk,
+                    @Param("id") long id,
+                    @Param("hostId") long hostId,
+                    @Param("cultureThumbRelPath") String cultureThumbRelPath);
 }
