@@ -249,6 +249,15 @@ public class MeetingController {
         return ResponseEntity.ok(Map.of("valid", ok));
     }
 
+     @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> delete(
+            @PathVariable("userId") long userId,
+            @PathVariable("id") long id
+    ) {
+        int deleted = service.deleteByHost(userId, id);
+        return ResponseEntity.ok(Map.of("deleted", deleted));
+    }
+
     // ===== DTO =====
     @Data
     public static class CreateMeetingReq {

@@ -407,5 +407,10 @@
       FROM tl_meetings
       WHERE meetings_id = #{meetingId}
   </select>
+  <delete id="deleteByHost">
+    DELETE FROM ${table}
+    WHERE ${pk} = #{id}
+      AND host_id = #{hostId}
+  </delete>
 
 </mapper>

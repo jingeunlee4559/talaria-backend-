@@ -236,6 +236,11 @@ public class MeetingService {
         }
         return updated;
     }
+    @Transactional
+    public int deleteByHost(long hostId, long id) {
+        return mapper.deleteByHost(TABLE, PK, hostId, id);
+    }
+
 
     public int regenerateInvite(long hostId, long id) {
         String invite = generateInviteCode(10);

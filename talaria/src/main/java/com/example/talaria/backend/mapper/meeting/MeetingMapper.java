@@ -139,4 +139,9 @@ public interface MeetingMapper {
                               @Param("privatePassword") String privatePassword);
 
     Map<String, Object> selectPrivateInfo(@Param("meetingId") long meetingId);
+
+    int deleteByHost(@Param("table") String table,
+                     @Param("pk") String pk,
+                     @Param("hostId") long hostId,
+                     @Param("id") long id);
 }
