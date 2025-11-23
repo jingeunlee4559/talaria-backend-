@@ -69,6 +69,7 @@ public class MeetingRawScriptService {
 
     /**
      * 요청한 포맷대로 text 생성
+     * - 같은 speaker_id가 연속해서 말한 내용은 한 줄로 합침
      */
     private String buildRawScriptText(
             String meetingTitle,
@@ -89,7 +90,11 @@ public class MeetingRawScriptService {
         sj.add("");
         sj.add("[스크립트]");
 
-        if (utterances != null) {
+        // 연속 발화 묶기 로직
+        if (utterances != null && !utterances.isEmpty()) {
+            String currentSpeaker = null;
+            StringBuilder currentText = new StringBuilder();
+
             for (Map<String, Object> row : utterances) {
                 Object speakerObj = row.get("speaker_id");
                 Object textObj = row.get("text");
@@ -100,7 +105,31 @@ public class MeetingRawScriptService {
                 if (text.isBlank()) {
                     continue;
                 }
-                sj.add(speaker + ": " + text.trim());
+
+                // 첫 화자 설정
+                if (currentSpeaker == null) {
+                    currentSpeaker = speaker;
+                    currentText.append(text.trim());
+                    continue;
+                }
+
+                // 같은 사람이 계속 말하면 이어 붙이기
+                if (currentSpeaker.equals(speaker)) {
+                    currentText.append(" ").append(text.trim());
+                } else {
+                    // 화자가 바뀌면 이전 내용 한 줄로 추가
+                    sj.add(currentSpeaker + ": " + currentText.toString().trim());
+
+                    // 새 화자 시작
+                    currentSpeaker = speaker;
+                    currentText.setLength(0);
+                    currentText.append(text.trim());
+                }
+            }
+
+            // 마지막 화자 flush
+            if (currentSpeaker != null && currentText.length() > 0) {
+                sj.add(currentSpeaker + ": " + currentText.toString().trim());
             }
         }
 
