@@ -21,5 +21,15 @@
     WHERE meeting_id = #{meetingId}
     ORDER BY started_ms ASC, seq ASC
   </select>
+   <!-- 회의별 발화 목록 (API용) -->
+  <select id="selectByMeetingForApi" parameterType="long" resultType="map">
+    SELECT
+      speaker_id,
+      text,
+      created_at
+    FROM tl_utterances
+    WHERE meeting_id = #{meetingId}
+    ORDER BY created_at ASC
+</select>
 
 </mapper>

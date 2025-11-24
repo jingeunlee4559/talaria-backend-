@@ -3,6 +3,7 @@ package com.example.talaria.backend.controller;
 import com.example.talaria.backend.dto.common.PageResponse;
 import com.example.talaria.backend.service.asset.FrontAssetStorage;
 import com.example.talaria.backend.service.meeting.MeetingService;
+import com.example.talaria.backend.service.meeting.UtteranceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -20,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -29,7 +31,8 @@ public class MeetingController {
 
     private final MeetingService service;
     private final FrontAssetStorage frontAssetStorage; // 프론트 퍼블릭 디렉터리 저장
-    private final ObjectMapper objectMapper;          // ★ 문자열 JSON 파싱용
+    private final ObjectMapper objectMapper;          //  문자열 JSON 파싱용
+    private final UtteranceService utteranceService;
 
     // 목록 조회 (호스트 기준)
     @GetMapping
@@ -248,8 +251,18 @@ public class MeetingController {
 
         return ResponseEntity.ok(Map.of("valid", ok));
     }
+    @GetMapping("/{meetingId}/utterances")
+    public ResponseEntity<List<Map<String, Object>>> listUtterances(
+            @PathVariable("userId") long userId,
+            @PathVariable("meetingId") long meetingId
+    ) {
+        var items = utteranceService.listByMeeting(userId, meetingId);
+        return ResponseEntity.ok(items);
+    }
 
-     @DeleteMapping("/{id}")
+
+
+    @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> delete(
             @PathVariable("userId") long userId,
             @PathVariable("id") long id

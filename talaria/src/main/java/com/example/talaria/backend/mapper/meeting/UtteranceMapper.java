@@ -15,4 +15,6 @@ public interface UtteranceMapper {
     List<Map<String, Object>> selectByMeetingForScript(
             @Param("meetingId") long meetingId
     );
+
+     List<Map<String, Object>> selectByMeetingForApi(@Param("meetingId") long meetingId);
 }
