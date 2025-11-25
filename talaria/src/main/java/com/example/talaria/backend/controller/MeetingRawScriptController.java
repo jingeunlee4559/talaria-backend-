@@ -1,6 +1,8 @@
 package com.example.talaria.backend.controller;
 
 import com.example.talaria.backend.service.meeting.MeetingRawScriptService;
+import com.example.talaria.backend.service.meeting.MeetingService;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -20,18 +22,8 @@ import java.util.Map;
 public class MeetingRawScriptController {
 
     private final MeetingRawScriptService rawScriptService;
+    private final MeetingService meetingService;
 
-    /**
-     * 프론트 → 백엔드
-     *
-     * POST /api/users/{userId}/meetings/{meetingId}/raw-script
-     *
-     * Body:
-     * {
-     *   "meetingTitle": "11월 정기 개발 회의",
-     *   "participants": ["김철수", "이영희"]
-     * }
-     */
     @PostMapping
     public ResponseEntity<Map<String, Object>> buildAndSend(
             @PathVariable("userId") long userId,
@@ -42,11 +34,23 @@ public class MeetingRawScriptController {
         log.info("[RawScript] request: userId={}, meetingId={}, title='{}', participants={}",
                 userId, meetingId, req.getMeetingTitle(), req.getParticipants());
 
+        // 1) tl_meetings 에서 회의 정보 조회 (scheduled_at 포함)
+        Map<String, Object> meeting = meetingService.getById(meetingId);
+        if (meeting == null) {
+            log.warn("[RawScript] meeting not found: meetingId={}", meetingId);
+            return ResponseEntity.notFound().build();
+        }
+        Object scheduledAt = meeting.get("scheduled_at");
+
+        // 2) raw-script 생성 + 파이썬 호출
         Map<String, Object> res = rawScriptService.buildAndSendRawScript(
                 meetingId,
                 req.getMeetingTitle(),
                 req.getParticipants()
         );
+
+        // 3) 응답에 scheduledAt 추가
+        res.put("scheduledAt", scheduledAt);
 
         return ResponseEntity.ok(res);
     }
