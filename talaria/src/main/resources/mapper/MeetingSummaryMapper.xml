@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.talaria.backend.mapper.meeting.MeetingSummaryMapper">
+
+    <select id="selectByMeetingAndLang" resultType="map">
+        SELECT
+            summary_id,
+            meeting_id,
+            lang,
+            meeting_date,
+            meeting_title,
+            participants,
+            participant_count,
+            summary,
+            meeting_score,
+            risk_level,
+            topics,
+            decisions,
+            action_items,
+            risks,
+            improvements,
+            next_steps,
+            created_at,
+            updated_at
+        FROM tl_meeting_summaries
+        WHERE meeting_id = #{meetingId}
+          AND lang = #{lang}
+        ORDER BY summary_id DESC
+        LIMIT 1
+    </select>
+
+</mapper>
