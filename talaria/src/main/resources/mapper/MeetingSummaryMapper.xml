@@ -33,6 +33,7 @@
         LIMIT 1
     </select>
 
+    <!--  user_id + lang 기준: 유저가 참여한 모든 회의 요약 -->
     <select id="selectAllByUserAndLang" resultType="map">
         SELECT
             s.summary_id,
@@ -53,10 +54,12 @@
             s.next_steps,
             s.created_at,
             s.updated_at
-        FROM tl_meeting_summaries s
-        JOIN tl_meetings m
-          ON s.meeting_id = m.meetings_id 
-        WHERE m.host_id = #{userId}
+        FROM tl_meeting_summaries    s
+        JOIN tl_meetings             m
+          ON s.meeting_id = m.meetings_id
+        JOIN tl_meeting_participants p
+          ON p.meetings_id = m.meetings_id
+        WHERE p.user_id = #{userId}
           AND s.lang    = #{lang}
         ORDER BY s.meeting_date DESC, s.summary_id DESC
     </select>
