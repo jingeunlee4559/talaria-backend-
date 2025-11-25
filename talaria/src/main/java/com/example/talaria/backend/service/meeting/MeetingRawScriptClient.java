@@ -11,6 +11,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -28,29 +29,30 @@ public class MeetingRawScriptClient {
      * - URL: {summarizeUrl} (예: http://localhost:8000/summary/process)
      * - Body 스키마:
      *   {
-     *     "meeting_id": "MTG_2025_001",
+     *     "meeting_id": "65",
      *     "current_date": "2025-11-24",
      *     "meeting_title": "1분기 제품 기획 회의",
-     *     "participants": "김철수, 이영희, 박민수",
+     *     "participants": "김철수, 이영희",
+     *     "scheduled_at": "2025-11-25T14:00:00",
      *     "transcript": "김철수: ..."
      *   }
      */
-    public Map<String, Object> sendRawScript(long meetingId, String rawScriptText) {
+    public Map<String, Object> sendRawScript(
+            long meetingId,
+            String meetingTitle,
+            List<String> participants,
+            Object scheduledAt,     // tl_meetings.scheduled_at (LocalDateTime 등)
+            String rawScriptText
+    ) {
         if (summarizeUrl == null || summarizeUrl.isBlank()) {
             throw new IllegalStateException("talaria.summarizeUrl 설정이 비어 있습니다. (.env 또는 application.yaml 확인)");
         }
 
         // =========================
-        // 1) rawScriptText 파싱
-        //     [회의 정보]
-        //     주제: ...
-        //     참석자: ...
-        //
-        //     [스크립트]
-        //     화자: 발화 ...
+        // 1) transcript 추출
+        //     [회의 정보] 블록은 그대로 두고
+        //     [스크립트] 이후 줄만 모아서 transcript로 사용
         // =========================
-        String meetingTitle = "";
-        String participants = "";
         String transcript = rawScriptText != null ? rawScriptText : "";
 
         if (rawScriptText != null && !rawScriptText.isBlank()) {
@@ -59,18 +61,12 @@ public class MeetingRawScriptClient {
 
             for (int i = 0; i < lines.length; i++) {
                 String line = lines[i].trim();
-
-                if (line.startsWith("주제:")) {
-                    meetingTitle = line.substring("주제:".length()).trim();
-                } else if (line.startsWith("참석자:")) {
-                    participants = line.substring("참석자:".length()).trim();
-                } else if (line.equals("[스크립트]")) {
+                if ("[스크립트]".equals(line)) {
                     scriptStartIdx = i + 1; // 다음 줄부터 실제 대화
                     break;
                 }
             }
 
-            // [스크립트] 이후 줄들만 transcript로 사용
             if (scriptStartIdx >= 0 && scriptStartIdx < lines.length) {
                 StringBuilder sb = new StringBuilder();
                 for (int i = scriptStartIdx; i < lines.length; i++) {
@@ -83,21 +79,23 @@ public class MeetingRawScriptClient {
             }
         }
 
+        // participants 리스트를 "이름1, 이름2, ..." 문자열로 변환
+        String participantsStr = "";
+        if (participants != null && !participants.isEmpty()) {
+            participantsStr = String.join(", ", participants);
+        }
+
         // =========================
         // 2) Python MeetingSummaryRequest 바디 구성
         // =========================
         Map<String, Object> body = new HashMap<>();
 
-        // meeting_id: 예시는 "MTG_2025_001" 이지만, 여기선 일단 단순히 ID 문자열 사용
-        // 필요하면 포맷을 "MTG_" + meetingId 같은 식으로 변경 가능.
         body.put("meeting_id", String.valueOf(meetingId));
-
-        // current_date: 오늘 날짜 (yyyy-MM-dd)
         body.put("current_date", LocalDate.now().toString());
-
-        body.put("meeting_title", meetingTitle);
-        body.put("participants", participants);  // "이름1, 이름2, ..."
-        body.put("transcript", transcript);      // "화자: 발화..." 줄바꿈 포함
+        body.put("meeting_title", meetingTitle != null ? meetingTitle : "");
+        body.put("participants", participantsStr);
+        body.put("scheduled_at", scheduledAt != null ? scheduledAt.toString() : null); // ★ 추가
+        body.put("transcript", transcript);
 
         log.info("[RawScript] summary request body for meetingId={}: {}", meetingId, body);
 

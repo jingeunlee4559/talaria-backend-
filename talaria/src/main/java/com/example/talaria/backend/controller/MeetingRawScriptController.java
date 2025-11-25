@@ -34,7 +34,7 @@ public class MeetingRawScriptController {
         log.info("[RawScript] request: userId={}, meetingId={}, title='{}', participants={}",
                 userId, meetingId, req.getMeetingTitle(), req.getParticipants());
 
-        // 1) tl_meetings 에서 회의 정보 조회 (scheduled_at 포함)
+        // 1) tl_meetings 조회 → scheduled_at 가져오기
         Map<String, Object> meeting = meetingService.getById(meetingId);
         if (meeting == null) {
             log.warn("[RawScript] meeting not found: meetingId={}", meetingId);
@@ -42,15 +42,13 @@ public class MeetingRawScriptController {
         }
         Object scheduledAt = meeting.get("scheduled_at");
 
-        // 2) raw-script 생성 + 파이썬 호출
+        // 2) Service 호출 (★ scheduledAt 추가되어 있음)
         Map<String, Object> res = rawScriptService.buildAndSendRawScript(
                 meetingId,
                 req.getMeetingTitle(),
-                req.getParticipants()
+                req.getParticipants(),
+                scheduledAt
         );
-
-        // 3) 응답에 scheduledAt 추가
-        res.put("scheduledAt", scheduledAt);
 
         return ResponseEntity.ok(res);
     }

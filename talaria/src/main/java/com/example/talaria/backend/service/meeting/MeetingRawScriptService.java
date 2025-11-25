@@ -27,6 +27,7 @@ public class MeetingRawScriptService {
      *  - meetingId
      *  - meetingTitle
      *  - participants (참석자 이름 리스트)
+     *  - scheduledAt (tl_meetings.scheduled_at)
      *
      * 처리:
      *  1) tl_utterances 조회
@@ -38,13 +39,14 @@ public class MeetingRawScriptService {
      *     [스크립트]
      *     {speaker_id}: {text}
      *     ...
-     *  3) raw_script text를 파이썬으로 전송
+     *  3) raw_script text + scheduledAt 을 파이썬으로 전송
      */
     @Transactional(readOnly = true)
     public Map<String, Object> buildAndSendRawScript(
             long meetingId,
             String meetingTitle,
-            List<String> participants
+            List<String> participants,
+            Object scheduledAt   // ★ 추가된 파라미터
     ) {
         // 1) tl_utterances 조회
         List<Map<String, Object>> utterances =
@@ -53,15 +55,22 @@ public class MeetingRawScriptService {
         // 2) 하나의 text로 합치기
         String rawScriptText = buildRawScriptText(meetingTitle, participants, utterances);
 
-        // 3) 파이썬 서비스로 전송
+        // 3) 파이썬 서비스로 전송 (scheduledAt 같이 전달)
         Map<String, Object> pyResponse =
-                rawScriptClient.sendRawScript(meetingId, rawScriptText);
+                rawScriptClient.sendRawScript(
+                        meetingId,
+                        meetingTitle,
+                        participants,
+                        scheduledAt,
+                        rawScriptText
+                );
 
-        // 4) 프론트로 돌려줄 응답 구성 (필요시 구조 변경 가능)
+        // 4) 프론트로 돌려줄 응답 구성
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("meetingId", meetingId);
         result.put("meetingTitle", meetingTitle);
         result.put("participants", participants);
+        result.put("scheduledAt", scheduledAt);   // ★ 응답에도 포함
         result.put("rawScript", rawScriptText);
         result.put("pythonResponse", pyResponse);
         return result;
