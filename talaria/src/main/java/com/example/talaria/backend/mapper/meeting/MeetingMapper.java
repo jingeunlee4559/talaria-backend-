@@ -144,4 +144,6 @@ public interface MeetingMapper {
                      @Param("pk") String pk,
                      @Param("hostId") long hostId,
                      @Param("id") long id);
+
+    List<Map<String, Object>> selectMeetingIdsByHost(@Param("hostId") long hostId);
 }

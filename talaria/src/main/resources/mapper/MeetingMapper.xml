@@ -413,4 +413,11 @@
       AND host_id = #{hostId}
   </delete>
 
+  <select id="selectMeetingIdsByHost" resultType="map">
+      SELECT id AS meeting_id
+      FROM tl_meetings
+      WHERE host_id = #{hostId}
+      ORDER BY id DESC
+  </select>
+
 </mapper>
