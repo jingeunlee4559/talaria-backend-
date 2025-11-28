@@ -49,4 +49,8 @@ public interface DocumentMapper {
                     @Param("table") String table,
                     @Param("userId") long userId,
                     @Param("docId") long docId);
+
+    Map<String, Object> selectById(@Param("table") String table,
+                                   @Param("pk")    String pk,
+                                   @Param("id")    long id);
 }

@@ -77,4 +77,18 @@
       AND uploader_user_id = #{userId}
   </update>
 
+  <select id="selectById" resultType="map">
+      SELECT *
+      FROM ${table}
+      WHERE ${pk} = #{id}
+  </select>
+  <select id="selectTranslationForMeeting" resultType="map">
+      SELECT *
+      FROM tl_meeting_documents
+      WHERE meeting_id   = #{meetingId}
+        AND doc_type     = 'TRANSLATION'
+        AND trans_doc_id = #{transDocId}
+      LIMIT 1
+  </select>
+
 </mapper>

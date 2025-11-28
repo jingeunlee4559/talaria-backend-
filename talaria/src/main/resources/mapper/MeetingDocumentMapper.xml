@@ -1,68 +1,73 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper
   PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
 <mapper namespace="com.example.talaria.backend.mapper.document.MeetingDocumentMapper">
+
     <!-- 회의 상태 조회 -->
     <select id="selectMeetingStatus" resultType="string">
         SELECT status
         FROM tl_meetings
         WHERE meetings_id = #{meetingId}
     </select>
-<select id="selectOriginalDocsByMeeting" parameterType="long" resultType="map">
-    SELECT
-      md.meeting_doc_id,
-      md.meeting_id,
-      'ORIGINAL'                           AS doc_type,
-      md.added_at,
-      d.doc_id                              AS doc_id,
-      NULL                                  AS trans_doc_id,
-      d.original_name                       AS original_name,
-      d.filepath                            AS rel_path,
-      d.mime_type                           AS mime_type,
-      d.size                                AS size,
-      d.uploaded_at                         AS uploaded_at,
-      d.original_lang                       AS source_lang,
-      NULL                                  AS target_language,
-      u.user_id                             AS added_by_user_id,
-      u.name                                AS added_by_user_name
-    FROM tl_meeting_documents md
-    JOIN tl_documents d   ON md.doc_id = d.doc_id
-    JOIN tl_users u       ON md.added_by_user_id = u.user_id
-    WHERE md.meeting_id = #{meetingId}
-      AND md.doc_id IS NOT NULL
-    ORDER BY md.added_at DESC, md.meeting_doc_id DESC
-  </select>
 
-  <!-- 번역 문서 목록 -->
-<select id="selectTranslationDocsByMeeting" parameterType="long" resultType="map">
-  SELECT
-    md.meeting_doc_id,
-    md.meeting_id,
-    'TRANSLATION'                        AS doc_type,
-    md.added_at,
-    NULL                                  AS doc_id,
-    td.trans_doc_id                       AS trans_doc_id,
-    orig.original_name                    AS original_name,
-    td.translated_rel_path                AS rel_path,
-    COALESCE(orig.mime_type, 'application/octet-stream') AS mime_type,  
-    td.size_bytes                         AS size,
-    td.translated_at                      AS uploaded_at,
-    orig.original_lang                    AS source_lang,
-    td.target_language                    AS target_language,
-    u.user_id                             AS added_by_user_id,
-    u.name                                AS added_by_user_name,
-    td.provider                           AS provider,
-    td.request_id                         AS request_id,
-    td.checksum_sha256                    AS checksum_sha256
-  FROM tl_meeting_documents md
-  JOIN tl_trans_docs   td   ON md.trans_doc_id = td.trans_doc_id
-  JOIN tl_documents    orig ON td.original_doc_id = orig.doc_id      
-  JOIN tl_users        u    ON md.added_by_user_id = u.user_id
-  WHERE md.meeting_id = #{meetingId}
-    AND md.trans_doc_id IS NOT NULL
-  ORDER BY md.added_at DESC, md.meeting_doc_id DESC
-</select>
+    <!-- 원본 문서 목록 -->
+    <select id="selectOriginalDocsByMeeting" parameterType="long" resultType="map">
+        SELECT
+          md.meeting_doc_id,
+          md.meeting_id,
+          'ORIGINAL'                           AS doc_type,
+          md.added_at,
+          d.doc_id                              AS doc_id,
+          NULL                                  AS trans_doc_id,
+          d.original_name                       AS original_name,
+          d.filepath                            AS rel_path,
+          d.mime_type                           AS mime_type,
+          d.size                                AS size,
+          d.uploaded_at                         AS uploaded_at,
+          d.original_lang                       AS source_lang,
+          NULL                                  AS target_language,
+          u.user_id                             AS added_by_user_id,
+          u.name                                AS added_by_user_name
+        FROM tl_meeting_documents md
+        JOIN tl_documents d   ON md.doc_id = d.doc_id
+        JOIN tl_users u       ON md.added_by_user_id = u.user_id
+        WHERE md.meeting_id = #{meetingId}
+          AND md.doc_id IS NOT NULL
+        ORDER BY md.added_at DESC, md.meeting_doc_id DESC
+    </select>
+
+    <!-- 번역 문서 목록 -->
+    <select id="selectTranslationDocsByMeeting" parameterType="long" resultType="map">
+        SELECT
+          md.meeting_doc_id,
+          md.meeting_id,
+          'TRANSLATION'                        AS doc_type,
+          md.added_at,
+          NULL                                  AS doc_id,
+          td.trans_doc_id                       AS trans_doc_id,
+          orig.original_name                    AS original_name,
+          td.translated_rel_path                AS rel_path,
+          COALESCE(orig.mime_type, 'application/octet-stream') AS mime_type,
+          td.size_bytes                         AS size,
+          td.translated_at                      AS uploaded_at,
+          orig.original_lang                    AS source_lang,
+          td.target_language                    AS target_language,
+          u.user_id                             AS added_by_user_id,
+          u.name                                AS added_by_user_name,
+          td.provider                           AS provider,
+          td.request_id                         AS request_id,
+          td.checksum_sha256                    AS checksum_sha256
+        FROM tl_meeting_documents md
+        JOIN tl_trans_docs   td   ON md.trans_doc_id = td.trans_doc_id
+        JOIN tl_documents    orig ON td.original_doc_id = orig.doc_id
+        JOIN tl_users        u    ON md.added_by_user_id = u.user_id
+        WHERE md.meeting_id = #{meetingId}
+          AND md.trans_doc_id IS NOT NULL
+        ORDER BY md.added_at DESC, md.meeting_doc_id DESC
+    </select>
+
     <!-- 원문 문서 추가 -->
     <insert id="insertOriginalDoc">
         INSERT INTO tl_meeting_documents (
@@ -73,28 +78,28 @@
     </insert>
 
     <!-- 번역 문서 추가 -->
-<insert id="insertTranslationDoc">
-  INSERT INTO tl_meeting_documents (
-    meeting_id, trans_doc_id, doc_type, added_by_user_id
-  ) VALUES (
-    #{meetingId}, #{transDocId}, 'TRANSLATION', #{addedByUserId} 
-  )
-</insert>
+    <insert id="insertTranslationDoc">
+        INSERT INTO tl_meeting_documents (
+            meeting_id, trans_doc_id, doc_type, added_by_user_id
+        ) VALUES (
+            #{meetingId}, #{transDocId}, 'TRANSLATION', #{addedByUserId}
+        )
+    </insert>
 
     <!-- 원문 문서 삭제 -->
     <delete id="deleteOriginalDoc">
         DELETE FROM tl_meeting_documents
         WHERE meeting_id = #{meetingId}
-          AND doc_id = #{docId}
-          AND doc_type = 'ORIGINAL'
+          AND doc_id     = #{docId}
+          AND doc_type   = 'ORIGINAL'
     </delete>
 
     <!-- 번역 문서 삭제 -->
     <delete id="deleteTranslationDoc">
         DELETE FROM tl_meeting_documents
-        WHERE meeting_id = #{meetingId}
+        WHERE meeting_id   = #{meetingId}
           AND trans_doc_id = #{transDocId}
-          AND doc_type = 'TRANSLATION'
+          AND doc_type     = 'TRANSLATION'
     </delete>
 
     <!-- 소유권 확인 -->
@@ -117,12 +122,12 @@
     <select id="countByUserAndMeeting" resultType="long">
         SELECT COUNT(*)
         FROM tl_meeting_documents md
-        LEFT JOIN tl_documents d ON md.doc_id = d.doc_id
-        LEFT JOIN tl_trans_docs td ON md.trans_doc_id = td.trans_doc_id
-        LEFT JOIN tl_documents orig ON td.original_doc_id = orig.doc_id
+        LEFT JOIN tl_documents d     ON md.doc_id = d.doc_id
+        LEFT JOIN tl_trans_docs td   ON md.trans_doc_id = td.trans_doc_id
+        LEFT JOIN tl_documents orig  ON td.original_doc_id = orig.doc_id
         WHERE md.meeting_id = #{meetingId}
           AND (
-              (md.doc_type = 'ORIGINAL' AND d.uploader_user_id = #{userId}) OR
+              (md.doc_type = 'ORIGINAL'    AND d.uploader_user_id    = #{userId}) OR
               (md.doc_type = 'TRANSLATION' AND orig.uploader_user_id = #{userId}) OR
               md.added_by_user_id = #{userId}
           )
@@ -135,44 +140,47 @@
             md.doc_type,
             md.added_at,
 
-            CASE WHEN md.doc_type = 'ORIGINAL' THEN d.doc_id END             AS doc_id,
-            CASE WHEN md.doc_type = 'TRANSLATION' THEN td.trans_doc_id END   AS trans_doc_id,
+            CASE WHEN md.doc_type = 'ORIGINAL'
+                 THEN d.doc_id END             AS doc_id,
+            CASE WHEN md.doc_type = 'TRANSLATION'
+                 THEN td.trans_doc_id END     AS trans_doc_id,
 
-            -- 노출용 공통 키
-            COALESCE(d.original_name, orig.original_name) COLLATE utf8mb4_unicode_ci AS original_name,
-            COALESCE(d.filepath, td.translated_rel_path) COLLATE utf8mb4_unicode_ci   AS rel_path,
+            COALESCE(d.original_name, orig.original_name)
+              COLLATE utf8mb4_unicode_ci      AS original_name,
+            COALESCE(d.filepath, td.translated_rel_path)
+              COLLATE utf8mb4_unicode_ci      AS rel_path,
             CASE
-              WHEN md.doc_type = 'ORIGINAL' THEN d.mime_type
+              WHEN md.doc_type = 'ORIGINAL'    THEN d.mime_type
               ELSE 'application/octet-stream'
-            END COLLATE utf8mb4_unicode_ci AS mime_type,
+            END COLLATE utf8mb4_unicode_ci    AS mime_type,
 
             CASE
-              WHEN md.doc_type = 'ORIGINAL' THEN d.size
+              WHEN md.doc_type = 'ORIGINAL'    THEN d.size
               ELSE td.size_bytes
-            END AS size,
+            END                                AS size,
 
             CASE
-              WHEN md.doc_type = 'ORIGINAL' THEN d.uploaded_at
+              WHEN md.doc_type = 'ORIGINAL'    THEN d.uploaded_at
               ELSE td.translated_at
-            END AS uploaded_at,
+            END                                AS uploaded_at,
 
             CASE
-              WHEN md.doc_type = 'ORIGINAL' THEN d.original_lang
+              WHEN md.doc_type = 'ORIGINAL'    THEN d.original_lang
               ELSE orig.original_lang
-            END COLLATE utf8mb4_unicode_ci AS source_lang,
+            END COLLATE utf8mb4_unicode_ci    AS source_lang,
 
             CASE
               WHEN md.doc_type = 'TRANSLATION' THEN td.target_language
               ELSE NULL
-            END COLLATE utf8mb4_unicode_ci AS target_language
+            END COLLATE utf8mb4_unicode_ci    AS target_language
 
         FROM tl_meeting_documents md
-        LEFT JOIN tl_documents d ON md.doc_id = d.doc_id
-        LEFT JOIN tl_trans_docs td ON md.trans_doc_id = td.trans_doc_id
-        LEFT JOIN tl_documents orig ON td.original_doc_id = orig.doc_id
+        LEFT JOIN tl_documents   d    ON md.doc_id      = d.doc_id
+        LEFT JOIN tl_trans_docs  td   ON md.trans_doc_id = td.trans_doc_id
+        LEFT JOIN tl_documents   orig ON td.original_doc_id = orig.doc_id
         WHERE md.meeting_id = #{meetingId}
           AND (
-              (md.doc_type = 'ORIGINAL' AND d.uploader_user_id = #{userId}) OR
+              (md.doc_type = 'ORIGINAL'    AND d.uploader_user_id    = #{userId}) OR
               (md.doc_type = 'TRANSLATION' AND orig.uploader_user_id = #{userId}) OR
               md.added_by_user_id = #{userId}
           )
@@ -190,10 +198,12 @@
             d.size
         FROM tl_meeting_documents md
         INNER JOIN tl_documents d ON md.doc_id = d.doc_id
-        WHERE md.meeting_id = #{meetingId}
-          AND md.doc_id = #{docId}
-          AND md.doc_type = 'ORIGINAL'
-          AND (d.uploader_user_id = #{userId} OR md.added_by_user_id = #{userId})
+        WHERE md.meeting_id      = #{meetingId}
+          AND md.doc_id          = #{docId}
+          AND md.doc_type        = 'ORIGINAL'
+          AND (d.uploader_user_id = #{userId}
+               OR md.added_by_user_id = #{userId})
+        LIMIT 1
     </select>
 
     <!-- 다운로드용: 번역 -->
@@ -201,7 +211,7 @@
         SELECT
             td.trans_doc_id,
             td.translated_rel_path AS filepath,
-            td.size_bytes AS size,
+            td.size_bytes          AS size,
             CONCAT(
                 SUBSTRING_INDEX(orig.original_name, '.', 1),
                 '.translated.',
@@ -211,12 +221,34 @@
             ) AS original_name,
             'application/octet-stream' AS mime_type
         FROM tl_meeting_documents md
-        INNER JOIN tl_trans_docs td ON md.trans_doc_id = td.trans_doc_id
-        INNER JOIN tl_documents orig ON td.original_doc_id = orig.doc_id
-        WHERE md.meeting_id = #{meetingId}
-          AND md.trans_doc_id = #{transDocId}
-          AND md.doc_type = 'TRANSLATION'
-          AND (orig.uploader_user_id = #{userId} OR md.added_by_user_id = #{userId})
+        INNER JOIN tl_trans_docs td   ON md.trans_doc_id = td.trans_doc_id
+        INNER JOIN tl_documents orig  ON td.original_doc_id = orig.doc_id
+        WHERE md.meeting_id      = #{meetingId}
+          AND md.trans_doc_id    = #{transDocId}
+          AND md.doc_type        = 'TRANSLATION'
+          AND (orig.uploader_user_id = #{userId}
+               OR md.added_by_user_id = #{userId})
+        LIMIT 1
+    </select>
+
+    <!-- 🔹 회의방 미리보기용: 원본 문서 링크 존재 여부 -->
+    <select id="selectOriginalForMeeting" resultType="map">
+        SELECT *
+        FROM tl_meeting_documents
+        WHERE meeting_id = #{meetingId}
+          AND doc_type   = 'ORIGINAL'
+          AND doc_id     = #{docId}
+        LIMIT 1
+    </select>
+
+    <!-- 🔹 회의방 미리보기용: 번역 문서 링크 존재 여부 -->
+    <select id="selectTranslationForMeeting" resultType="map">
+        SELECT *
+        FROM tl_meeting_documents
+        WHERE meeting_id   = #{meetingId}
+          AND doc_type     = 'TRANSLATION'
+          AND trans_doc_id = #{transDocId}
+        LIMIT 1
     </select>
 
 </mapper>

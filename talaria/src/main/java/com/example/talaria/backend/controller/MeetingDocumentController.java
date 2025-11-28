@@ -103,7 +103,7 @@ public class MeetingDocumentController {
         }
     }
 
-    // ✅ 번역 다운로드 (프론트에서 번역행에 대해 이 엔드포인트 호출)
+    //  번역 다운로드 (프론트에서 번역행에 대해 이 엔드포인트 호출)
     @GetMapping("/translations/{transDocId}/download")
     public ResponseEntity<?> downloadTranslated(@PathVariable long userId, @PathVariable long meetingId, @PathVariable long transDocId) {
         try {

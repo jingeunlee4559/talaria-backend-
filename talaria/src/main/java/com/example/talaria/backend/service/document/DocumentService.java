@@ -19,8 +19,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
@@ -34,6 +34,7 @@ import java.util.regex.Pattern;
 public class DocumentService {
 
     private final DocumentMapper mapper;
+    private final com.example.talaria.backend.mapper.document.MeetingDocumentMapper meetingDocumentMapper;
 
     private static final String TABLE = "tl_documents";
     private static final String PK    = "doc_id";
@@ -416,6 +417,9 @@ public class DocumentService {
 
     public record DownloadFile(Path path, String downloadName, String mimeType) {}
 
+    /**
+     * 일반 다운로드용 (회의ID 검증 없음)
+     */
     public DownloadFile getFileForDownload(long userId, long docId) {
         Map<String, Object> row = mapper.selectOneByUser(TABLE, PK, userId, docId);
         if (row == null || row.isEmpty()) {
@@ -441,8 +445,66 @@ public class DocumentService {
                 ? originalName
                 : target.getFileName().toString();
 
-        return new DownloadFile(target, downloadName, (mimeType == null || mimeType.isBlank())
-                ? "application/octet-stream" : mimeType);
+        return new DownloadFile(target, downloadName,
+                (mimeType == null || mimeType.isBlank())
+                        ? "application/octet-stream"
+                        : mimeType);
+    }
+
+     /**
+     * 회의방 전용 원본 문서 미리보기/다운로드용 메타 조회
+     *
+     * 권한 모델:
+     *  1) tl_meeting_documents 에서
+     *     - meeting_id = meetingId
+     *     - doc_type   = 'ORIGINAL'
+     *     - doc_id     = docId
+     *     행이 존재해야 함
+     *  2) tl_documents 에서 doc_id 로 실제 파일 메타 조회
+     *  3) 업로더(userId)는 여기서 강제하지 않고,
+     *     "해당 회의에 연결된 문서"인지만 검증
+     */
+    public DownloadFile getFileForMeetingPreview(long userId, long meetingId, long docId) {
+        // 1) 이 문서가 해당 회의에 실제로 붙어 있는지 먼저 확인
+        Map<String, Object> linkRow =
+                meetingDocumentMapper.selectOriginalForMeeting(meetingId, docId);
+
+        if (linkRow == null || linkRow.isEmpty()) {
+            log.warn("Original doc not linked to meeting: meetingId={}, docId={}", meetingId, docId);
+            throw new SecurityException("Document does not belong to this meeting");
+        }
+
+        // 2) tl_documents 에서 실제 파일 메타 조회 (업로더 제약 없음)
+        Map<String, Object> row = mapper.selectById(TABLE, PK, docId);
+        if (row == null || row.isEmpty()) {
+            throw new SecurityException("Document not found");
+        }
+
+        String rel          = asString(row.get("filepath"));
+        String originalName = asString(row.get("original_name"));
+        String mimeType     = asString(row.get("mime_type"));
+
+        if (rel == null || rel.isBlank()) {
+            throw new IllegalStateException("Filepath not found in DB");
+        }
+
+        // 3) 실제 파일 경로 계산
+        Path root   = Paths.get(docsRootDir).toAbsolutePath().normalize();
+        Path target = root.resolve(rel.replace('\\', '/')).normalize();
+
+        if (!target.startsWith(root)) {
+            throw new SecurityException("Invalid path");
+        }
+
+        String downloadName = (originalName != null && !originalName.isBlank())
+                ? originalName
+                : target.getFileName().toString();
+
+        String effectiveMime = (mimeType == null || mimeType.isBlank())
+                ? "application/octet-stream"
+                : mimeType;
+
+        return new DownloadFile(target, downloadName, effectiveMime);
     }
 
     private static String asString(Object v) {
